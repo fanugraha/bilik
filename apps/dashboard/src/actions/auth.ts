@@ -23,15 +23,22 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const supabase = await createClient();
 
+  const password = formData.get("password") as string;
+  const konfirmasiPassword = formData.get("konfirmasi_password") as string;
+
+  if (password !== konfirmasiPassword) {
+    redirect("/register?error=" + encodeURIComponent("Konfirmasi kata sandi tidak cocok"));
+  }
+
   const data = {
     email: formData.get("email") as string,
-    password: formData.get("password") as string,
+    password,
   };
 
   const { error, data: authData } = await supabase.auth.signUp(data);
 
   if (error) {
-    redirect("/login?error=" + encodeURIComponent(error.message));
+    redirect("/register?error=" + encodeURIComponent(error.message));
   }
 
   if (authData.user) {
@@ -39,7 +46,7 @@ export async function signup(formData: FormData) {
     await supabase.from("guru").insert({
       id: authData.user.id,
       email: authData.user.email,
-      nama: formData.get("nama") as string || authData.user.email?.split("@")[0] || "Guru",
+      nama: (formData.get("nama") as string) || authData.user.email?.split("@")[0] || "Guru",
     });
   }
 

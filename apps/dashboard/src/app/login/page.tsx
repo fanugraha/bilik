@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { login, signup } from "@/actions/auth";
+import Link from "next/link";
+import { login } from "@/actions/auth";
 import { Pesan } from "@/components/ui/alert";
 import { Tombol } from "@/components/ui/button";
 import { KotakInput } from "@/components/ui/input";
@@ -34,17 +35,17 @@ async function FormLogin({
           wajib
           minPanjang={6}
         />
-        <KotakInput
-          nama="nama"
-          label="Nama (untuk daftar baru)"
-          tipe="text"
-          placeholder="Nama Anda"
-        />
-        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-2">
           <Tombol teks="Masuk" jenis="utama" formAction={login} />
-          <Tombol teks="Daftar" jenis="kedua" formAction={signup} />
         </div>
       </form>
+
+      <div className="mt-6 text-center text-sm text-gray-600">
+        Belum punya akun?{" "}
+        <Link href="/register" className="font-semibold text-blue-600 hover:text-blue-500">
+          Daftar di sini
+        </Link>
+      </div>
     </div>
   );
 }
@@ -61,9 +62,7 @@ export default function LoginPage({
           <h1 className="text-4xl font-bold tracking-tight text-gray-900">
             Dashboard Bilik
           </h1>
-          <p className="mt-3 text-gray-600">
-            Masuk atau daftar sebagai guru
-          </p>
+          <p className="mt-3 text-gray-600">Masuk sebagai guru</p>
         </div>
         <Suspense fallback={null}>
           <FormLogin searchParams={searchParams} />
