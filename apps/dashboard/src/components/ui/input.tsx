@@ -5,6 +5,7 @@ type KotakInputProps = {
   wajib?: boolean;
   minPanjang?: number;
   placeholder?: string;
+  defaultValue?: string;
 };
 
 export function KotakInput({
@@ -14,6 +15,7 @@ export function KotakInput({
   wajib = false,
   minPanjang,
   placeholder,
+  defaultValue,
 }: KotakInputProps) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -27,6 +29,7 @@ export function KotakInput({
         required={wajib}
         minLength={minPanjang}
         placeholder={placeholder}
+        defaultValue={defaultValue}
         className="rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
     </div>

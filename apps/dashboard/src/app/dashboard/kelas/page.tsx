@@ -72,6 +72,12 @@ async function DaftarKelas({
                     className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
                   />
                   <Tombol teks="Simpan" jenis="kedua" formAction={updateKelas} />
+                  <a
+                    href={`/dashboard/kelas/${kelas.id}/siswa`}
+                    className="text-sm text-indigo-600 hover:underline"
+                  >
+                    Siswa
+                  </a>
                 </form>
                 <form>
                   <input type="hidden" name="id" value={kelas.id} />

@@ -4,6 +4,7 @@ type TombolProps = {
   teks: string;
   jenis?: JenisTombol;
   formAction?: (formData: FormData) => void;
+  className?: string;
 };
 
 const warnaTombol: Record<JenisTombol, string> = {
@@ -12,11 +13,11 @@ const warnaTombol: Record<JenisTombol, string> = {
   bahaya: "bg-red-600 text-white hover:bg-red-700",
 };
 
-export function Tombol({ teks, jenis = "utama", formAction }: TombolProps) {
+export function Tombol({ teks, jenis = "utama", formAction, className = "w-full" }: TombolProps) {
   return (
     <button
       formAction={formAction}
-      className={`w-full rounded-lg px-4 py-2.5 font-medium transition-colors ${warnaTombol[jenis]}`}
+      className={`${className} rounded-lg px-4 py-2.5 font-medium transition-colors ${warnaTombol[jenis]}`}
     >
       {teks}
     </button>
