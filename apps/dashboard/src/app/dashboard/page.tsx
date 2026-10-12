@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
@@ -30,14 +31,30 @@ async function IsiDashboard() {
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <a href="/dashboard/kelas">
+        <Link href="/dashboard/kelas">
           <Kartu>
             <h2 className="font-semibold text-gray-900">Kelola Kelas</h2>
             <p className="mt-1 text-sm text-gray-600">
               Buat dan atur kelas serta daftar siswa.
             </p>
           </Kartu>
-        </a>
+        </Link>
+        <Link href="/dashboard/soal">
+          <Kartu>
+            <h2 className="font-semibold text-gray-900">Bank Soal</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Buat dan atur soal PG serta essay.
+            </p>
+          </Kartu>
+        </Link>
+        <Link href="/dashboard/ujian">
+          <Kartu>
+            <h2 className="font-semibold text-gray-900">Kelola Ujian</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Susun ujian, buka lobby, dan pantau ruang kontrol.
+            </p>
+          </Kartu>
+        </Link>
       </div>
 
       <form>
