@@ -20,12 +20,15 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: soal } = await supabase
-    .from("soal")
-    .select("tipe, teks, opsi, kunci, pedoman, bobot, jawaban_benar, penjelasan")
-    .eq("id", id)
-    .eq("guru_id", user.id)
-    .single();
+  const [{ data: soal }, { data: daftarBank }] = await Promise.all([
+    supabase
+      .from("soal")
+      .select("tipe, teks, opsi, kunci, pedoman, bobot, jawaban_benar, penjelasan, bank_soal_id")
+      .eq("id", id)
+      .eq("guru_id", user.id)
+      .single(),
+    supabase.from("bank_soal").select("id, nama").eq("guru_id", user.id).order("nama", { ascending: true }),
+  ]);
 
   if (!soal) redirect("/dashboard/soal");
 
@@ -39,6 +42,7 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
     jawaban_benar: soal.jawaban_benar,
     penjelasan: soal.penjelasan,
     pedoman: soal.pedoman,
+    bank_soal_id: soal.bank_soal_id,
   };
 
   return (
@@ -49,7 +53,7 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
         </div>
       )}
       <Kartu>
-        <FormSoal aksi={updateSoal} teksSimpan="Simpan perubahan" idSoal={id} nilaiAwal={nilaiAwal} />
+        <FormSoal aksi={updateSoal} teksSimpan="Simpan perubahan" idSoal={id} nilaiAwal={nilaiAwal} daftarBank={daftarBank ?? []} />
       </Kartu>
     </>
   );

@@ -1,5 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { connection } from "next/server";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { createSoal } from "@/actions/soal";
 import { FormSoal } from "@/components/form-soal";
 import { Kartu } from "@/components/ui/card";
@@ -18,6 +21,23 @@ async function PesanError({ searchParams }: { searchParams: Promise<{ error?: st
   );
 }
 
+async function IsianSoal() {
+  await connection();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: daftarBank } = await supabase
+    .from("bank_soal")
+    .select("id, nama")
+    .eq("guru_id", user.id)
+    .order("nama", { ascending: true });
+
+  return <FormSoal aksi={createSoal} teksSimpan="Simpan soal" daftarBank={daftarBank ?? []} />;
+}
+
 export default function BuatSoalPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   return (
     <div className="max-w-3xl">
@@ -26,7 +46,9 @@ export default function BuatSoalPage({ searchParams }: { searchParams: Promise<{
         <PesanError searchParams={searchParams} />
       </Suspense>
       <Kartu>
-        <FormSoal aksi={createSoal} teksSimpan="Simpan soal" />
+        <Suspense fallback={<p className="text-sm text-tinta-2">Memuat...</p>}>
+          <IsianSoal />
+        </Suspense>
       </Kartu>
     </div>
   );

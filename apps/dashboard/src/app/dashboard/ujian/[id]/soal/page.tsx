@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { connection } from "next/server";
@@ -15,7 +16,7 @@ import { TautanTombol } from "@/components/ui/tautan-tombol";
 
 export const metadata: Metadata = { title: "Atur soal ujian" };
 
-async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searchParams: Promise<{ error?: string }> }) {
+async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searchParams: Promise<{ error?: string; bank?: string }> }) {
   await connection();
   const supabase = await createClient();
   const {
@@ -34,14 +35,22 @@ async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searc
   if (!ujian) redirect("/dashboard/ujian");
   if (ujian.status !== "draft") redirect(`/dashboard/ujian/${ujianId}/lobby`);
 
-  const [{ data: soalUjian }, { data: semuaSoal }] = await Promise.all([
+  const [{ data: soalUjian }, { data: semuaSoal }, { data: daftarBank }] = await Promise.all([
     supabase.from("ujian_soal").select("soal_id, urutan, bobot").eq("ujian_id", ujianId).order("urutan", { ascending: true }),
-    supabase.from("soal").select("id, tipe, teks, bobot").eq("guru_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("soal").select("id, tipe, teks, bobot, bank_soal_id").eq("guru_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("bank_soal").select("id, nama").eq("guru_id", user.id).order("nama", { ascending: true }),
   ]);
 
   const soalPerId = new Map((semuaSoal ?? []).map((soal) => [soal.id, soal]));
   const idSoalTerpilih = new Set((soalUjian ?? []).map((baris) => baris.soal_id));
   const soalTersedia = (semuaSoal ?? []).filter((soal) => !idSoalTerpilih.has(soal.id));
+
+  const { error: errorQuery, bank = "" } = await searchParams;
+
+  const bankList = daftarBank ?? [];
+  const namaBank = new Map(bankList.map((b) => [b.id, b.nama]));
+  const bankTerpilih = bankList.some((b) => b.id === bank) ? bank : "";
+  const soalTampil = bankTerpilih ? soalTersedia.filter((soal) => soal.bank_soal_id === bankTerpilih) : soalTersedia;
 
   let totalBobot = 0;
   for (const baris of soalUjian ?? []) totalBobot += Number(baris.bobot);
@@ -50,7 +59,6 @@ async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searc
     .map((baris) => (Array.isArray(baris.kelas) ? baris.kelas[0]?.nama : baris.kelas?.nama))
     .filter(Boolean);
 
-  const { error: errorQuery } = await searchParams;
   const jumlahSoal = soalUjian?.length ?? 0;
 
   return (
@@ -121,6 +129,36 @@ async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searc
         </Kartu>
 
         <Kartu judul="Bank soal" deskripsi={`${soalTersedia.length} soal belum dipakai di ujian ini`} tanpaPadding className="lg:sticky lg:top-8">
+          {bankList.length > 0 && soalTersedia.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-garis bg-kertas/40 px-5 py-3">
+              <span className="mr-1 text-xs font-semibold text-tinta-3">Bank:</span>
+              <Link
+                href={`/dashboard/ujian/${ujianId}/soal`}
+                aria-current={bankTerpilih === "" ? "page" : undefined}
+                className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${
+                  bankTerpilih === "" ? "bg-papan text-white" : "bg-permukaan text-tinta-2 ring-1 ring-garis ring-inset hover:text-tinta"
+                }`}
+              >
+                Semua
+              </Link>
+              {bankList.map((b) => {
+                const aktif = bankTerpilih === b.id;
+                return (
+                  <Link
+                    key={b.id}
+                    href={`/dashboard/ujian/${ujianId}/soal?bank=${b.id}`}
+                    aria-current={aktif ? "page" : undefined}
+                    className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${
+                      aktif ? "bg-papan text-white" : "bg-permukaan text-tinta-2 ring-1 ring-garis ring-inset hover:text-tinta"
+                    }`}
+                  >
+                    {b.nama}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           {soalTersedia.length === 0 ? (
             <KeadaanKosong
               ikon="soal"
@@ -128,29 +166,54 @@ async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searc
               deskripsi="Tulis soal baru di bank soal, lalu kembali ke sini."
               aksi={<TautanTombol href="/dashboard/soal/buat" teks="Tulis soal" ikon="tambah" />}
             />
+          ) : soalTampil.length === 0 ? (
+            <KeadaanKosong
+              ikon="cari"
+              judul="Tidak ada soal di bank ini"
+              deskripsi="Semua soal bank ini sudah dipakai, atau banknya masih kosong. Pilih bank lain."
+              aksi={<TautanTombol href={`/dashboard/ujian/${ujianId}/soal`} teks="Tampilkan semua soal" />}
+            />
           ) : (
-            <form action={tambahSoalUjian}>
-              <input type="hidden" name="ujian_id" value={ujianId} />
-              <ul className="max-h-[60vh] divide-y divide-garis overflow-y-auto">
-                {soalTersedia.map((soal) => (
-                  <li key={soal.id}>
-                    <label className="flex cursor-pointer items-start gap-3 px-5 py-3 hover:bg-kertas has-[:checked]:bg-nila-muda">
-                      <input type="checkbox" name="soal_ids[]" value={soal.id} className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-nila)]" />
-                      <span className="min-w-0">
-                        <span className="line-clamp-2 text-sm text-tinta">{soal.teks}</span>
-                        <span className="mt-1 flex items-center gap-2">
-                          <LencanaTipeSoal tipe={soal.tipe} />
-                          <span className="text-xs text-tinta-2">Bobot {soal.bobot}</span>
+            <>
+              <form action={tambahSoalUjian}>
+                <input type="hidden" name="ujian_id" value={ujianId} />
+                <ul className="max-h-[60vh] divide-y divide-garis overflow-y-auto">
+                  {soalTampil.map((soal) => (
+                    <li key={soal.id}>
+                      <label className="flex cursor-pointer items-start gap-3 px-5 py-3 hover:bg-kertas has-[:checked]:bg-nila-muda">
+                        <input type="checkbox" name="soal_ids[]" value={soal.id} className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-nila)]" />
+                        <span className="min-w-0">
+                          <span className="line-clamp-2 text-sm text-tinta">{soal.teks}</span>
+                          <span className="mt-1 flex items-center gap-2">
+                            <LencanaTipeSoal tipe={soal.tipe} />
+                            <span className="text-xs text-tinta-2">Bobot {soal.bobot}</span>
+                          </span>
                         </span>
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-              <div className="border-t border-garis p-4">
-                <Tombol teks="Tambahkan soal yang dicentang" ikon="tambah" teksProses="Menambahkan..." className="w-full" />
-              </div>
-            </form>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <div className="border-t border-garis p-4">
+                  <Tombol teks="Tambahkan soal yang dicentang" ikon="tambah" teksProses="Menambahkan..." className="w-full" />
+                </div>
+              </form>
+
+              {bankTerpilih && (
+                <form action={tambahSoalUjian} className="border-t border-garis bg-kertas/40 p-4">
+                  <input type="hidden" name="ujian_id" value={ujianId} />
+                  {soalTampil.map((soal) => (
+                    <input key={soal.id} type="hidden" name="soal_ids[]" value={soal.id} />
+                  ))}
+                  <Tombol
+                    teks={`Tambah semua ${soalTampil.length} soal dari bank ${namaBank.get(bankTerpilih) ?? ""}`}
+                    ikon="tambah"
+                    jenis="kedua"
+                    teksProses="Menambahkan..."
+                    className="w-full"
+                  />
+                </form>
+              )}
+            </>
           )}
         </Kartu>
       </div>

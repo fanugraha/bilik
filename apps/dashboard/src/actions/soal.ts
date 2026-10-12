@@ -32,6 +32,13 @@ function cekOpsiPg(opsi: string[], adaCelah: boolean, kunci: string | null): str
   return null;
 }
 
+// Bank soal hanya boleh milik guru sendiri (FK tidak cek RLS, jadi dicek manual).
+async function bankMilik(supabase: Awaited<ReturnType<typeof createClient>>, guruId: string, bankId: string | null) {
+  if (!bankId) return null;
+  const { data } = await supabase.from("bank_soal").select("id").eq("id", bankId).eq("guru_id", guruId).maybeSingle();
+  return data?.id ?? null;
+}
+
 export async function createSoal(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -43,6 +50,7 @@ export async function createSoal(formData: FormData) {
   const tipe = formData.get("tipe") as string;
   const teks = (formData.get("teks") as string)?.trim();
   const bobot = parseFloat(formData.get("bobot") as string) || 1;
+  const bankId = await bankMilik(supabase, user.id, (formData.get("bank_soal_id") as string) || null);
 
   if (!teks) redirect("/dashboard/soal/buat?error=" + encodeURIComponent("Teks soal wajib diisi"));
 
@@ -58,6 +66,7 @@ export async function createSoal(formData: FormData) {
       opsi,
       kunci,
       bobot,
+      bank_soal_id: bankId,
     });
     if (error) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(error.message));
   } else if (tipe === "benar_salah") {
@@ -70,6 +79,7 @@ export async function createSoal(formData: FormData) {
       jawaban_benar: jawabanBenar,
       penjelasan,
       bobot,
+      bank_soal_id: bankId,
     });
     if (error) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(error.message));
   } else {
@@ -80,6 +90,7 @@ export async function createSoal(formData: FormData) {
       teks,
       pedoman,
       bobot,
+      bank_soal_id: bankId,
     });
     if (error) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(error.message));
   }
@@ -100,6 +111,7 @@ export async function updateSoal(formData: FormData) {
   const tipe = formData.get("tipe") as string;
   const teks = (formData.get("teks") as string)?.trim();
   const bobot = parseFloat(formData.get("bobot") as string) || 1;
+  const bankId = await bankMilik(supabase, user.id, (formData.get("bank_soal_id") as string) || null);
 
   if (!teks) redirect(`/dashboard/soal/${id}/ubah?error=` + encodeURIComponent("Teks soal wajib diisi"));
 
@@ -109,14 +121,14 @@ export async function updateSoal(formData: FormData) {
     const kunci = formData.get("kunci") as string | null;
     const pesanOpsi = cekOpsiPg(opsi, adaCelah, kunci);
     if (pesanOpsi) redirect(`/dashboard/soal/${id}/ubah?error=` + encodeURIComponent(pesanOpsi));
-    payload = { tipe: "pg", teks, opsi, kunci, pedoman: null, jawaban_benar: null, penjelasan: null, bobot };
+    payload = { tipe: "pg", teks, opsi, kunci, pedoman: null, jawaban_benar: null, penjelasan: null, bobot, bank_soal_id: bankId };
   } else if (tipe === "benar_salah") {
     const jawabanBenar = formData.get("jawaban_benar") === "true";
     const penjelasan = (formData.get("penjelasan") as string)?.trim() || null;
-    payload = { tipe: "benar_salah", teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null };
+    payload = { tipe: "benar_salah", teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null, bank_soal_id: bankId };
   } else {
     const pedoman = (formData.get("pedoman") as string)?.trim() || null;
-    payload = { tipe: "essay", teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null };
+    payload = { tipe: "essay", teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null, bank_soal_id: bankId };
   }
 
   const { error } = await supabase

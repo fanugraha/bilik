@@ -15,13 +15,17 @@ export type NilaiAwalSoal = {
   jawaban_benar: boolean | null;
   penjelasan: string | null;
   pedoman: string | null;
+  bank_soal_id: string | null;
 };
+
+export type BankRingkas = { id: string; nama: string };
 
 type FormSoalProps = {
   aksi: (formData: FormData) => void | Promise<void>;
   teksSimpan: string;
   idSoal?: string;
   nilaiAwal?: NilaiAwalSoal;
+  daftarBank?: BankRingkas[];
 };
 
 const pilihanTipe: { nilai: TipeSoal; teks: string; keterangan: string }[] = [
@@ -33,7 +37,7 @@ const pilihanTipe: { nilai: TipeSoal; teks: string; keterangan: string }[] = [
 const hurufOpsi = ["A", "B", "C", "D", "E"];
 
 // Form soal untuk halaman Buat dan Ubah. Hanya isian yang relevan dengan tipe soal yang tampil.
-export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal }: FormSoalProps) {
+export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank = [] }: FormSoalProps) {
   const [tipe, setTipe] = useState<TipeSoal>(nilaiAwal?.tipe ?? "pg");
 
   return (
@@ -64,6 +68,23 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal }: FormSoalProps)
           ))}
         </div>
       </fieldset>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="bank_soal_id" className="text-sm font-medium text-tinta">
+          Bank soal <span className="font-normal text-tinta-2">(opsional, untuk mengelompokkan)</span>
+        </label>
+        <select id="bank_soal_id" name="bank_soal_id" defaultValue={nilaiAwal?.bank_soal_id ?? ""} className="bidang">
+          <option value="">Tanpa bank</option>
+          {daftarBank.map((bank) => (
+            <option key={bank.id} value={bank.id}>
+              {bank.nama}
+            </option>
+          ))}
+        </select>
+        {daftarBank.length === 0 && (
+          <p className="text-xs text-tinta-2">Belum ada bank soal. Buat bank di halaman Bank soal bila ingin mengelompokkan.</p>
+        )}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
         <div className="flex flex-col gap-1.5">
