@@ -1,4 +1,4 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
@@ -7,6 +7,10 @@ import { updateUjian } from "@/actions/ujian";
 import { IsianUjian } from "@/components/isian-ujian";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
+import { KepalaHalaman } from "@/components/ui/kepala-halaman";
+import { TautanTombol } from "@/components/ui/tautan-tombol";
+
+export const metadata: Metadata = { title: "Ubah ujian" };
 
 async function FormUbahUjian({ ujianId, searchParams }: { ujianId: string; searchParams: Promise<{ error?: string }> }) {
   await connection();
@@ -38,26 +42,26 @@ async function FormUbahUjian({ ujianId, searchParams }: { ujianId: string; searc
 
   if (ujian.status !== "draft") {
     return (
-      <Pesan jenis="info">
-        Ujian yang sudah dibuka lobby tidak bisa diubah lagi.{" "}
-        <Link href="/dashboard/ujian" className="underline">
-          Kembali ke daftar ujian
-        </Link>
-      </Pesan>
+      <div className="space-y-4">
+        <Pesan jenis="info">Pengaturan tidak bisa diubah lagi karena lobby ujian ini sudah dibuka.</Pesan>
+        <TautanTombol href="/dashboard/ujian" teks="Kembali ke daftar ujian" />
+      </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      {errorQuery && <Pesan jenis="error">{errorQuery}</Pesan>}
-
+    <>
+      {errorQuery && (
+        <div className="mb-4">
+          <Pesan jenis="error">{errorQuery}</Pesan>
+        </div>
+      )}
       <Kartu>
-        <h2 className="mb-6 text-lg font-semibold text-gray-900">Ubah Ujian</h2>
-        <form action={updateUjian} className="space-y-6">
+        <form action={updateUjian}>
           <input type="hidden" name="id" value={ujian.id} />
           <IsianUjian
             listKelas={listKelas ?? []}
-            teksSimpan="Simpan Perubahan"
+            teksSimpan="Simpan perubahan"
             hrefBatal={`/dashboard/ujian/${ujianId}/soal`}
             nilaiAwal={{
               judul: ujian.judul,
@@ -71,7 +75,7 @@ async function FormUbahUjian({ ujianId, searchParams }: { ujianId: string; searc
           />
         </form>
       </Kartu>
-    </div>
+    </>
   );
 }
 
@@ -83,17 +87,12 @@ export default function UbahUjianPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Ubah Ujian</h1>
-        <Link href="/dashboard/ujian" className="text-sm text-indigo-600 hover:underline">
-          ← Kembali
-        </Link>
-      </div>
-      <Suspense fallback={<p className="text-gray-500">Memuat...</p>}>
+    <div className="max-w-3xl">
+      <KepalaHalaman judul="Ubah pengaturan ujian" kembali={{ href: "/dashboard/ujian", teks: "Semua ujian" }} />
+      <Suspense fallback={<p className="text-sm text-tinta-2">Memuat...</p>}>
         <HalamanUbah params={params} searchParams={searchParams} />
       </Suspense>
-    </main>
+    </div>
   );
 }
 

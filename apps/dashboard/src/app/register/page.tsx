@@ -1,87 +1,46 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { signup } from "@/actions/auth";
+import { CangkangAuth } from "@/components/cangkang-auth";
 import { Pesan } from "@/components/ui/alert";
 import { Tombol } from "@/components/ui/button";
 import { KotakInput } from "@/components/ui/input";
 
-async function FormDaftar({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export const metadata: Metadata = { title: "Daftar" };
+
+async function FormDaftar({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-      {error && (
-        <div className="mb-6">
-          <Pesan jenis="error">{error}</Pesan>
-        </div>
-      )}
-
-      <form className="flex flex-col gap-5">
-        <KotakInput
-          nama="nama"
-          label="Nama"
-          tipe="text"
-          wajib
-          placeholder="Nama Anda"
-        />
-        <KotakInput
-          nama="email"
-          label="Email"
-          tipe="email"
-          wajib
-          placeholder="guru@sekolah.com"
-        />
-        <KotakInput
-          nama="password"
-          label="Kata sandi"
-          tipe="password"
-          wajib
-          minPanjang={6}
-        />
-        <KotakInput
-          nama="konfirmasi_password"
-          label="Konfirmasi kata sandi"
-          tipe="password"
-          wajib
-          minPanjang={6}
-        />
-        <div className="mt-2">
-          <Tombol teks="Daftar" jenis="utama" formAction={signup} />
-        </div>
-      </form>
-
-      <div className="mt-6 text-center text-sm text-gray-600">
-        Sudah punya akun?{" "}
-        <Link href="/login" className="font-semibold text-blue-600 hover:text-blue-500">
-          Masuk di sini
-        </Link>
-      </div>
-    </div>
+    <form className="flex flex-col gap-5">
+      {error && <Pesan jenis="error">{error}</Pesan>}
+      <KotakInput nama="nama" label="Nama" wajib placeholder="Contoh: Rina Kusuma, S.Pd." autoComplete="name" bantuan="Nama ini tampil di dashboard." />
+      <KotakInput nama="email" label="Email" tipe="email" wajib placeholder="guru@sekolah.sch.id" autoComplete="email" />
+      <KotakInput nama="password" label="Kata sandi" tipe="password" wajib minPanjang={6} autoComplete="new-password" bantuan="Minimal 6 karakter." />
+      <KotakInput nama="konfirmasi_password" label="Ulangi kata sandi" tipe="password" wajib minPanjang={6} autoComplete="new-password" />
+      <Tombol teks="Buat akun" teksProses="Membuat akun..." formAction={signup} className="w-full" />
+    </form>
   );
 }
 
-export default function RegisterPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default function RegisterPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-            Dashboard Bilik
-          </h1>
-          <p className="mt-3 text-gray-600">Daftar sebagai guru baru</p>
-        </div>
-        <Suspense fallback={null}>
-          <FormDaftar searchParams={searchParams} />
-        </Suspense>
-      </div>
-    </main>
+    <CangkangAuth
+      judul="Daftar sebagai guru"
+      deskripsi="Satu akun untuk semua kelas dan ujian Anda."
+      kaki={
+        <>
+          Sudah punya akun?{" "}
+          <Link href="/login" className="font-semibold text-nila hover:text-nila-tua">
+            Masuk
+          </Link>
+        </>
+      }
+    >
+      <Suspense fallback={null}>
+        <FormDaftar searchParams={searchParams} />
+      </Suspense>
+    </CangkangAuth>
   );
 }

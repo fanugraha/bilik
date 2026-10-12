@@ -65,18 +65,18 @@ export function PemantauRealtime({ ujianId, listPesertaId }: PemantauRealtimePro
     };
   }, [ujianId, kunciPeserta, router]);
 
-  let warnaTitik = "bg-yellow-400";
+  let warnaTitik = "bg-kuning";
   let teksStatus = "Menyambung...";
   if (statusSambungan === "live") {
-    warnaTitik = "bg-green-500";
-    teksStatus = "Live";
+    warnaTitik = "bg-hijau animate-pulse";
+    teksStatus = "Langsung";
   } else if (statusSambungan === "terputus") {
-    warnaTitik = "bg-red-500";
+    warnaTitik = "bg-merah";
     teksStatus = "Terputus, muat ulang halaman";
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-tinta-2">
       <span className={`h-2 w-2 rounded-full ${warnaTitik}`} />
       {teksStatus}
     </span>

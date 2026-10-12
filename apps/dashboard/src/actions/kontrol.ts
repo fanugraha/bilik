@@ -318,3 +318,33 @@ export async function tambahWaktu(formData: FormData) {
       encodeURIComponent(`Waktu ditambah ${menit} menit untuk ${listPesertaAktif?.length ?? 0} siswa`),
   );
 }
+
+export async function setujuiSemuaPeserta(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const ujianId = formData.get("ujian_id") as string;
+  const halamanLobby = `/dashboard/ujian/${ujianId}/lobby`;
+
+  const { data: ujian } = await supabase.from("ujian").select("status").eq("id", ujianId).eq("guru_id", user.id).single();
+  if (!ujian) redirect("/dashboard/ujian");
+  if (ujian.status !== "lobby" && ujian.status !== "berjalan") {
+    redirect(halamanLobby + "?error=" + encodeURIComponent("Ujian sudah selesai"));
+  }
+
+  const { data: listDisetujui, error } = await supabase
+    .from("peserta")
+    .update({ disetujui: true })
+    .eq("ujian_id", ujianId)
+    .eq("disetujui", false)
+    .select("id");
+
+  if (error) redirect(halamanLobby + "?error=" + encodeURIComponent(error.message));
+
+  revalidatePath(halamanLobby);
+  redirect(halamanLobby + "?sukses=" + encodeURIComponent(`${listDisetujui?.length ?? 0} siswa disetujui`));
+}

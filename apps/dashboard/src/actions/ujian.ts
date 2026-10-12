@@ -223,6 +223,16 @@ export async function generateKode(formData: FormData) {
   if (!user) redirect("/login");
 
   const ujianId = formData.get("ujian_id") as string;
+  const halamanSoal = `/dashboard/ujian/${ujianId}/soal`;
+
+  await pastikanUjianDraft(supabase, ujianId, user.id);
+
+  const [{ count: jumlahSoal }, { count: jumlahKelas }] = await Promise.all([
+    supabase.from("ujian_soal").select("soal_id", { count: "exact", head: true }).eq("ujian_id", ujianId),
+    supabase.from("ujian_kelas").select("kelas_id", { count: "exact", head: true }).eq("ujian_id", ujianId),
+  ]);
+  if (!jumlahSoal) redirect(halamanSoal + "?error=" + encodeURIComponent("Tambahkan minimal 1 soal sebelum membuka lobby"));
+  if (!jumlahKelas) redirect(halamanSoal + "?error=" + encodeURIComponent("Pilih minimal 1 kelas peserta sebelum membuka lobby"));
 
   const { data: kode, error } = await supabase.rpc("generate_kode_ujian");
 

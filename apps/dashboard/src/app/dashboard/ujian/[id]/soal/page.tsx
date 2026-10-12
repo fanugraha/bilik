@@ -1,20 +1,21 @@
-import Link from "next/link";
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { tambahSoalUjian, hapusSoalUjian, generateKode } from "@/actions/ujian";
 import { Tombol } from "@/components/ui/button";
+import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
+import { KepalaHalaman } from "@/components/ui/kepala-halaman";
+import { KeadaanKosong } from "@/components/ui/keadaan-kosong";
+import { LencanaTipeSoal } from "@/components/ui/lencana";
+import { TautanTombol } from "@/components/ui/tautan-tombol";
 
-async function AturSoalUjian({
-  ujianId,
-  searchParams,
-}: {
-  ujianId: string;
-  searchParams: Promise<{ error?: string }>;
-}) {
+export const metadata: Metadata = { title: "Atur soal ujian" };
+
+async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searchParams: Promise<{ error?: string }> }) {
   await connection();
   const supabase = await createClient();
   const {
@@ -25,160 +26,147 @@ async function AturSoalUjian({
 
   const { data: ujian } = await supabase
     .from("ujian")
-    .select("id, judul, durasi, acak_soal, acak_opsi, batas_pelanggaran, status")
+    .select("id, judul, mapel, durasi, acak_soal, acak_opsi, batas_pelanggaran, status, ujian_kelas(kelas(nama))")
     .eq("id", ujianId)
     .eq("guru_id", user.id)
     .single();
 
   if (!ujian) redirect("/dashboard/ujian");
+  if (ujian.status !== "draft") redirect(`/dashboard/ujian/${ujianId}/lobby`);
 
-  const { data: soalUjian } = await supabase
-    .from("ujian_soal")
-    .select("ujian_id, soal_id, urutan, bobot")
-    .eq("ujian_id", ujianId)
-    .order("urutan", { ascending: true });
+  const [{ data: soalUjian }, { data: semuaSoal }] = await Promise.all([
+    supabase.from("ujian_soal").select("soal_id, urutan, bobot").eq("ujian_id", ujianId).order("urutan", { ascending: true }),
+    supabase.from("soal").select("id, tipe, teks, bobot").eq("guru_id", user.id).order("created_at", { ascending: false }),
+  ]);
 
-  const { data: allSoal } = await supabase
-    .from("soal")
-    .select("id, tipe, teks, bobot")
-    .eq("guru_id", user.id)
-    .order("created_at", { ascending: false });
+  const soalPerId = new Map((semuaSoal ?? []).map((soal) => [soal.id, soal]));
+  const idSoalTerpilih = new Set((soalUjian ?? []).map((baris) => baris.soal_id));
+  const soalTersedia = (semuaSoal ?? []).filter((soal) => !idSoalTerpilih.has(soal.id));
 
-  const soalUjianIds = (soalUjian || []).map((su) => su.soal_id);
-  const soalTersedia = (allSoal || []).filter((s) => !soalUjianIds.includes(s.id));
+  let totalBobot = 0;
+  for (const baris of soalUjian ?? []) totalBobot += Number(baris.bobot);
+
+  const listNamaKelas = ((ujian.ujian_kelas ?? []) as { kelas: { nama: string } | { nama: string }[] | null }[])
+    .map((baris) => (Array.isArray(baris.kelas) ? baris.kelas[0]?.nama : baris.kelas?.nama))
+    .filter(Boolean);
 
   const { error: errorQuery } = await searchParams;
-
-  const typeLabel = (tipe: string) => {
-    switch (tipe) {
-      case "pg":
-        return "PG";
-      case "essay":
-        return "Essay";
-      case "benar_salah":
-        return "B/S";
-      default:
-        return tipe;
-    }
-  };
+  const jumlahSoal = soalUjian?.length ?? 0;
 
   return (
-    <div className="space-y-6">
-      {errorQuery && <Pesan jenis="error">{errorQuery}</Pesan>}
+    <>
+      <KepalaHalaman
+        judul={ujian.judul}
+        deskripsi={
+          [ujian.mapel, `${ujian.durasi} menit`, listNamaKelas.length > 0 ? `kelas ${listNamaKelas.join(", ")}` : "belum ada kelas peserta"]
+            .filter(Boolean)
+            .join(", ")
+        }
+        kembali={{ href: "/dashboard/ujian", teks: "Semua ujian" }}
+        aksi={
+          <>
+            <TautanTombol href={`/dashboard/ujian/${ujianId}/ubah`} teks="Ubah pengaturan" jenis="kedua" />
+            {jumlahSoal > 0 && listNamaKelas.length > 0 && (
+              <form action={generateKode}>
+                <input type="hidden" name="ujian_id" value={ujianId} />
+                <TombolKonfirmasi
+                  teks="Buka lobby"
+                  pesanKonfirmasi="Buka lobby sekarang? Kode ujian akan dibuat dan soal tidak bisa diubah lagi."
+                />
+              </form>
+            )}
+          </>
+        }
+      />
 
-      <Kartu>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h3 className="text-base font-semibold text-gray-900">{ujian.judul}</h3>
-          {ujian.status === "draft" && (
-            <Link href={`/dashboard/ujian/${ujianId}/ubah`} className="text-sm text-indigo-600 hover:underline">
-              Ubah pengaturan
-            </Link>
-          )}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-600">
-          <div>Durasi: {ujian.durasi} menit</div>
-          <div>Acak Soal: {ujian.acak_soal ? "Ya" : "Tidak"}</div>
-          <div>Acak Opsi: {ujian.acak_opsi ? "Ya" : "Tidak"}</div>
-          <div>Batas Pelanggaran: {ujian.batas_pelanggaran}</div>
-        </div>
-      </Kartu>
-
-      {soalUjian && soalUjian.length > 0 ? (
-        <Kartu>
-          <h4 className="mb-4 text-base font-semibold text-gray-900">Soal Terpilih ({soalUjian.length})</h4>
-          <div className="space-y-2">
-            {soalUjian.map((su, idx) => {
-              const soal = allSoal?.find((s) => s.id === su.soal_id);
-              return (
-                <div
-                  key={su.soal_id}
-                  className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 p-3"
-                >
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">
-                      {idx + 1}. {soal?.teks.substring(0, 50)}... <span className="text-xs text-gray-600">({typeLabel(soal?.tipe || "")})</span>
-                    </div>
-                  </div>
-                  <form>
-                    <input type="hidden" name="ujian_id" value={ujianId} />
-                    <input type="hidden" name="soal_id" value={su.soal_id} />
-                    <Tombol teks="Hapus" jenis="bahaya" formAction={hapusSoalUjian} />
-                  </form>
-                </div>
-              );
-            })}
-          </div>
-        </Kartu>
-      ) : (
-        <Pesan jenis="info">Belum ada soal. Tambahkan soal di bawah.</Pesan>
-      )}
-
-      {soalTersedia.length > 0 && (
-        <Kartu>
-          <h4 className="mb-4 text-base font-semibold text-gray-900">Tambah Soal dari Bank ({soalTersedia.length})</h4>
-          <form action={tambahSoalUjian} className="space-y-4">
-            <input type="hidden" name="ujian_id" value={ujianId} />
-            <div className="space-y-2">
-              {soalTersedia.map((soal) => (
-                <label key={soal.id} className="flex items-center gap-2 cursor-pointer rounded border border-gray-200 p-2 hover:bg-gray-50">
-                  <input type="checkbox" name="soal_ids[]" value={soal.id} className="w-4 h-4" />
-                  <div className="flex-1 text-sm text-gray-900">{soal.teks.substring(0, 60)}...</div>
-                  <span className="text-xs text-gray-600">{typeLabel(soal.tipe)}</span>
-                </label>
-              ))}
-            </div>
-            <Tombol teks="Tambah Soal Pilihan" jenis="utama" />
-          </form>
-        </Kartu>
-      )}
-
-      <div className="flex gap-3 pt-4 border-t">
-        <Link href="/dashboard/ujian" className="flex-1">
-          <Tombol teks="Batal" jenis="kedua" className="w-full" />
-        </Link>
-        {ujian.status === "draft" && soalUjian && soalUjian.length > 0 && (
-          <form className="flex-1">
-            <input type="hidden" name="ujian_id" value={ujianId} />
-            <Tombol teks="Generate Kode & Buka Lobby" jenis="utama" formAction={generateKode} className="w-full" />
-          </form>
+      <div className="space-y-4">
+        {errorQuery && <Pesan jenis="error">{errorQuery}</Pesan>}
+        {listNamaKelas.length === 0 && (
+          <Pesan jenis="peringatan">Pilih minimal satu kelas peserta di Ubah pengaturan sebelum membuka lobby.</Pesan>
         )}
       </div>
-    </div>
+
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <Kartu
+          judul="Soal di ujian ini"
+          deskripsi={jumlahSoal === 0 ? "Belum ada soal dipilih." : `${jumlahSoal} soal, total bobot ${totalBobot}`}
+          tanpaPadding
+        >
+          {jumlahSoal === 0 ? (
+            <KeadaanKosong ikon="soal" judul="Pilih soal dari bank soal" deskripsi="Centang soal di panel sebelah, lalu tambahkan ke ujian." />
+          ) : (
+            <ol className="divide-y divide-garis">
+              {(soalUjian ?? []).map((baris, indeks) => {
+                const soal = soalPerId.get(baris.soal_id);
+                return (
+                  <li key={baris.soal_id} className="flex items-start gap-4 px-5 py-3.5">
+                    <span className="angka w-6 shrink-0 pt-0.5 text-right text-sm font-semibold text-tinta-3">{indeks + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-sm text-tinta">{soal?.teks}</p>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        {soal && <LencanaTipeSoal tipe={soal.tipe} />}
+                        <span className="text-xs text-tinta-2">Bobot {baris.bobot}</span>
+                      </div>
+                    </div>
+                    <form action={hapusSoalUjian}>
+                      <input type="hidden" name="ujian_id" value={ujianId} />
+                      <input type="hidden" name="soal_id" value={baris.soal_id} />
+                      <Tombol teks="Keluarkan" jenis="hantu" ukuran="kecil" teksProses="..." className="hover:text-merah" />
+                    </form>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </Kartu>
+
+        <Kartu judul="Bank soal" deskripsi={`${soalTersedia.length} soal belum dipakai di ujian ini`} tanpaPadding className="lg:sticky lg:top-8">
+          {soalTersedia.length === 0 ? (
+            <KeadaanKosong
+              ikon="soal"
+              judul={(semuaSoal ?? []).length === 0 ? "Bank soal kosong" : "Semua soal sudah dipakai"}
+              deskripsi="Tulis soal baru di bank soal, lalu kembali ke sini."
+              aksi={<TautanTombol href="/dashboard/soal/buat" teks="Tulis soal" ikon="tambah" />}
+            />
+          ) : (
+            <form action={tambahSoalUjian}>
+              <input type="hidden" name="ujian_id" value={ujianId} />
+              <ul className="max-h-[60vh] divide-y divide-garis overflow-y-auto">
+                {soalTersedia.map((soal) => (
+                  <li key={soal.id}>
+                    <label className="flex cursor-pointer items-start gap-3 px-5 py-3 hover:bg-kertas has-[:checked]:bg-nila-muda">
+                      <input type="checkbox" name="soal_ids[]" value={soal.id} className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-nila)]" />
+                      <span className="min-w-0">
+                        <span className="line-clamp-2 text-sm text-tinta">{soal.teks}</span>
+                        <span className="mt-1 flex items-center gap-2">
+                          <LencanaTipeSoal tipe={soal.tipe} />
+                          <span className="text-xs text-tinta-2">Bobot {soal.bobot}</span>
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-garis p-4">
+                <Tombol teks="Tambahkan soal yang dicentang" ikon="tambah" teksProses="Menambahkan..." className="w-full" />
+              </div>
+            </form>
+          )}
+        </Kartu>
+      </div>
+    </>
   );
 }
 
-export default function AturSoalPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default function AturSoalPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   return (
-    <Suspense fallback={<p className="text-gray-500">Memuat...</p>}>
+    <Suspense fallback={<p className="text-sm text-tinta-2">Memuat...</p>}>
       <HalamanAturSoal params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function HalamanAturSoal({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
-}) {
+async function HalamanAturSoal({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   const { id } = await params;
-
-  return (
-    <main className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Atur Soal Ujian</h1>
-        <Link href="/dashboard/ujian" className="text-sm text-indigo-600 hover:underline">
-          ← Kembali
-        </Link>
-      </div>
-      <AturSoalUjian ujianId={id} searchParams={searchParams} />
-    </main>
-  );
+  return <AturSoalUjian ujianId={id} searchParams={searchParams} />;
 }

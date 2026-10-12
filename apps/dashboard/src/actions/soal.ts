@@ -4,14 +4,32 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-function ambilOpsi(formData: FormData): string[] {
-  const huruf = ["A", "B", "C", "D", "E"];
+const HURUF_OPSI = ["A", "B", "C", "D", "E"];
+
+// Opsi harus berurutan (A, B, C, ...). Ada celah (mis. A, B, D) membuat huruf kunci
+// tidak cocok lagi dengan posisi opsi yang tersimpan, jadi ditolak.
+function ambilOpsi(formData: FormData): { opsi: string[]; adaCelah: boolean } {
   const opsi: string[] = [];
-  for (const h of huruf) {
-    const v = (formData.get(`opsi_${h}`) as string)?.trim();
-    if (v) opsi.push(v);
+  let sudahKosong = false;
+  let adaCelah = false;
+  for (const huruf of HURUF_OPSI) {
+    const isi = (formData.get(`opsi_${huruf}`) as string)?.trim();
+    if (!isi) {
+      sudahKosong = true;
+      continue;
+    }
+    if (sudahKosong) adaCelah = true;
+    opsi.push(isi);
   }
-  return opsi;
+  return { opsi, adaCelah };
+}
+
+function cekOpsiPg(opsi: string[], adaCelah: boolean, kunci: string | null): string | null {
+  if (adaCelah) return "Isi pilihan jawaban berurutan tanpa melompat (A, B, C, ...)";
+  if (opsi.length < 2) return "Pilihan ganda butuh minimal 2 pilihan";
+  const indeksKunci = kunci ? HURUF_OPSI.indexOf(kunci) : -1;
+  if (indeksKunci < 0 || indeksKunci >= opsi.length) return "Kunci jawaban harus salah satu pilihan yang terisi";
+  return null;
 }
 
 export async function createSoal(formData: FormData) {
@@ -29,13 +47,10 @@ export async function createSoal(formData: FormData) {
   if (!teks) redirect("/dashboard/soal/buat?error=" + encodeURIComponent("Teks soal wajib diisi"));
 
   if (tipe === "pg") {
-    const opsi = ambilOpsi(formData);
-    const kunci = formData.get("kunci") as string;
-    if (opsi.length < 2)
-      redirect("/dashboard/soal/buat?error=" + encodeURIComponent("PG butuh minimal 2 opsi"));
-    const idx = kunci.charCodeAt(0) - 65;
-    if (!kunci || idx < 0 || idx >= opsi.length)
-      redirect("/dashboard/soal/buat?error=" + encodeURIComponent("Kunci tidak cocok dengan opsi"));
+    const { opsi, adaCelah } = ambilOpsi(formData);
+    const kunci = formData.get("kunci") as string | null;
+    const pesanOpsi = cekOpsiPg(opsi, adaCelah, kunci);
+    if (pesanOpsi) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(pesanOpsi));
     const { error } = await supabase.from("soal").insert({
       guru_id: user.id,
       tipe: "pg",
@@ -90,18 +105,18 @@ export async function updateSoal(formData: FormData) {
 
   let payload: Record<string, unknown>;
   if (tipe === "pg") {
-    const opsi = ambilOpsi(formData);
-    const kunci = formData.get("kunci") as string;
-    if (opsi.length < 2)
-      redirect(`/dashboard/soal/${id}/ubah?error=` + encodeURIComponent("PG butuh minimal 2 opsi"));
-    payload = { teks, opsi, kunci, pedoman: null, bobot };
+    const { opsi, adaCelah } = ambilOpsi(formData);
+    const kunci = formData.get("kunci") as string | null;
+    const pesanOpsi = cekOpsiPg(opsi, adaCelah, kunci);
+    if (pesanOpsi) redirect(`/dashboard/soal/${id}/ubah?error=` + encodeURIComponent(pesanOpsi));
+    payload = { tipe: "pg", teks, opsi, kunci, pedoman: null, jawaban_benar: null, penjelasan: null, bobot };
   } else if (tipe === "benar_salah") {
     const jawabanBenar = formData.get("jawaban_benar") === "true";
     const penjelasan = (formData.get("penjelasan") as string)?.trim() || null;
-    payload = { teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null };
+    payload = { tipe: "benar_salah", teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null };
   } else {
     const pedoman = (formData.get("pedoman") as string)?.trim() || null;
-    payload = { teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null };
+    payload = { tipe: "essay", teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null };
   }
 
   const { error } = await supabase

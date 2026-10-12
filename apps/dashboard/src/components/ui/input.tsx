@@ -1,11 +1,13 @@
 type KotakInputProps = {
   nama: string;
   label: string;
-  tipe?: "text" | "email" | "password";
+  tipe?: "text" | "email" | "password" | "number";
   wajib?: boolean;
   minPanjang?: number;
   placeholder?: string;
-  defaultValue?: string;
+  defaultValue?: string | number;
+  bantuan?: string;
+  autoComplete?: string;
 };
 
 export function KotakInput({
@@ -16,10 +18,12 @@ export function KotakInput({
   minPanjang,
   placeholder,
   defaultValue,
+  bantuan,
+  autoComplete,
 }: KotakInputProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={nama} className="text-sm font-medium text-gray-700">
+      <label htmlFor={nama} className="text-sm font-medium text-tinta">
         {label}
       </label>
       <input
@@ -30,8 +34,15 @@ export function KotakInput({
         minLength={minPanjang}
         placeholder={placeholder}
         defaultValue={defaultValue}
-        className="rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        autoComplete={autoComplete}
+        aria-describedby={bantuan ? `${nama}-bantuan` : undefined}
+        className="bidang"
       />
+      {bantuan && (
+        <p id={`${nama}-bantuan`} className="text-xs text-tinta-2">
+          {bantuan}
+        </p>
+      )}
     </div>
   );
 }
