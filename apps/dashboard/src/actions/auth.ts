@@ -30,24 +30,15 @@ export async function signup(formData: FormData) {
     redirect("/register?error=" + encodeURIComponent("Konfirmasi kata sandi tidak cocok"));
   }
 
-  const data = {
+  // Profil di tabel 'guru' dibuat trigger database dari metadata ini (PRD 7)
+  const { error } = await supabase.auth.signUp({
     email: formData.get("email") as string,
     password,
-  };
-
-  const { error, data: authData } = await supabase.auth.signUp(data);
+    options: { data: { nama: (formData.get("nama") as string)?.trim() || null } },
+  });
 
   if (error) {
     redirect("/register?error=" + encodeURIComponent(error.message));
-  }
-
-  if (authData.user) {
-    // Simpan profil guru ke tabel 'guru' (PRD 7)
-    await supabase.from("guru").insert({
-      id: authData.user.id,
-      email: authData.user.email,
-      nama: (formData.get("nama") as string) || authData.user.email?.split("@")[0] || "Guru",
-    });
   }
 
   redirect("/dashboard");
