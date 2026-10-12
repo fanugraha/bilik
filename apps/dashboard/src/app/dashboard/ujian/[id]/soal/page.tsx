@@ -67,7 +67,14 @@ async function AturSoalUjian({
       {errorQuery && <Pesan jenis="error">{errorQuery}</Pesan>}
 
       <Kartu>
-        <h3 className="text-base font-semibold text-gray-900 mb-2">{ujian.judul}</h3>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 className="text-base font-semibold text-gray-900">{ujian.judul}</h3>
+          {ujian.status === "draft" && (
+            <Link href={`/dashboard/ujian/${ujianId}/ubah`} className="text-sm text-indigo-600 hover:underline">
+              Ubah pengaturan
+            </Link>
+          )}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-600">
           <div>Durasi: {ujian.durasi} menit</div>
           <div>Acak Soal: {ujian.acak_soal ? "Ya" : "Tidak"}</div>

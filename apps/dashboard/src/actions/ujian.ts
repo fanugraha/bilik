@@ -4,6 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+// Hanya kelas milik guru yang boleh jadi peserta ujian
+async function saringKelasMilikGuru(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  listKelasId: string[],
+  guruId: string,
+) {
+  if (listKelasId.length === 0) return [];
+  const { data: listKelas } = await supabase.from("kelas").select("id").in("id", listKelasId).eq("guru_id", guruId);
+  return (listKelas ?? []).map((kelas) => kelas.id);
+}
+
 export async function createUjian(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -39,7 +50,7 @@ export async function createUjian(formData: FormData) {
 
   if (error) redirect("/dashboard/ujian/buat?error=" + encodeURIComponent(error.message));
 
-  const kelasIds = formData.getAll("kelas_ids[]") as string[];
+  const kelasIds = await saringKelasMilikGuru(supabase, formData.getAll("kelas_ids[]") as string[], user.id);
   if (kelasIds.length > 0) {
     const kelasData = kelasIds.map((kelas_id) => ({ ujian_id: ujian.id, kelas_id }));
     await supabase.from("ujian_kelas").insert(kelasData);
@@ -68,6 +79,8 @@ export async function updateUjian(formData: FormData) {
   if (!judul) redirect(`/dashboard/ujian/${id}/ubah?error=` + encodeURIComponent("Judul wajib diisi"));
   if (!durasi || durasi < 1) redirect(`/dashboard/ujian/${id}/ubah?error=` + encodeURIComponent("Durasi minimal 1 menit"));
 
+  await pastikanUjianDraft(supabase, id, user.id);
+
   const { error } = await supabase
     .from("ujian")
     .update({
@@ -85,14 +98,14 @@ export async function updateUjian(formData: FormData) {
 
   await supabase.from("ujian_kelas").delete().eq("ujian_id", id);
 
-  const kelasIds = formData.getAll("kelas_ids[]") as string[];
+  const kelasIds = await saringKelasMilikGuru(supabase, formData.getAll("kelas_ids[]") as string[], user.id);
   if (kelasIds.length > 0) {
     const kelasData = kelasIds.map((kelas_id) => ({ ujian_id: id, kelas_id }));
     await supabase.from("ujian_kelas").insert(kelasData);
   }
 
   revalidatePath("/dashboard/ujian");
-  redirect("/dashboard/ujian");
+  redirect(`/dashboard/ujian/${id}/soal`);
 }
 
 export async function deleteUjian(formData: FormData) {
@@ -161,7 +174,11 @@ export async function tambahSoalUjian(formData: FormData) {
 
   const bobotPerSoal = new Map((listSoalDipilih ?? []).map((soal) => [soal.id, soal.bobot]));
 
-  const data = soalIds.map((soal_id) => ({
+  // Soal milik guru lain diabaikan
+  const soalIdMilikGuru = soalIds.filter((soal_id) => bobotPerSoal.has(soal_id));
+  if (soalIdMilikGuru.length === 0) redirect(`/dashboard/ujian/${ujianId}/soal?error=` + encodeURIComponent("Soal tidak ditemukan"));
+
+  const data = soalIdMilikGuru.map((soal_id) => ({
     ujian_id: ujianId,
     soal_id,
     urutan: urutan++,

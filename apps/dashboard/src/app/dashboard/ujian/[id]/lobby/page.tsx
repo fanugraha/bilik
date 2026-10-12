@@ -3,12 +3,26 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { setujuiPeserta, mulaiUjian, akhiriUjian, beriKodeBuka } from "@/actions/kontrol";
+import {
+  setujuiPeserta,
+  mulaiUjian,
+  akhiriUjian,
+  beriKodeBuka,
+  tolakPeserta,
+  resetPerangkat,
+  tambahWaktu,
+} from "@/actions/kontrol";
 import { Tombol } from "@/components/ui/button";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
 import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
 import { PemantauRealtime } from "@/components/pemantau-realtime";
+import { JamLokal } from "@/components/ui/jam-lokal";
+
+type ParamRuangKontrol = { error?: string; sukses?: string; kode_buka?: string; nama?: string };
+
+const kelasInputMenit =
+  "w-16 rounded-lg border border-gray-300 px-2 py-1 text-right text-xs focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500";
 
 interface DataSiswa {
   nama: string;
@@ -20,6 +34,8 @@ interface PesertaItem {
   status: string;
   disetujui: boolean;
   jumlah_pelanggaran: number;
+  tambahan_waktu: number;
+  selesai_at: string | null;
   siswa: DataSiswa | DataSiswa[];
 }
 
@@ -28,7 +44,7 @@ async function RuangKontrol({
   searchParams,
 }: {
   ujianId: string;
-  searchParams: Promise<{ error?: string; kode_buka?: string; nama?: string }>;
+  searchParams: Promise<ParamRuangKontrol>;
 }) {
   await connection();
   const supabase = await createClient();
@@ -54,6 +70,8 @@ async function RuangKontrol({
       status,
       disetujui,
       jumlah_pelanggaran,
+      tambahan_waktu,
+      selesai_at,
       siswa:siswa_id (
         nama,
         no_absen
@@ -84,7 +102,7 @@ async function RuangKontrol({
     if (peserta.disetujui) jumlahDisetujui++;
   }
 
-  const { error: errorQuery, kode_buka: kodeBuka, nama: namaKodeBuka } = await searchParams;
+  const { error: errorQuery, sukses: pesanSukses, kode_buka: kodeBuka, nama: namaKodeBuka } = await searchParams;
 
   const statusPesertaBadge = (status: string) => {
     switch (status) {
@@ -104,6 +122,7 @@ async function RuangKontrol({
   return (
     <div className="space-y-6">
       {errorQuery && <Pesan jenis="error">{errorQuery}</Pesan>}
+      {pesanSukses && <Pesan jenis="sukses">{pesanSukses}</Pesan>}
 
       {kodeBuka && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
@@ -122,6 +141,11 @@ async function RuangKontrol({
             {ujian.kode || "------"}
           </div>
           <p className="text-xs text-indigo-700 mt-1">Siswa memasukkan kode ini di aplikasi mobile untuk bergabung.</p>
+          {ujian.status === "berjalan" && ujian.selesai_at && (
+            <p className="mt-2 text-sm text-indigo-900">
+              Selesai pukul <strong><JamLokal waktuIso={ujian.selesai_at} /></strong>
+            </p>
+          )}
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           {ujian.status === "lobby" && (
@@ -142,6 +166,18 @@ async function RuangKontrol({
             >
               Lihat Nilai
             </Link>
+          )}
+          {ujian.status === "berjalan" && (
+            <form action={tambahWaktu} className="flex items-center gap-2">
+              <input type="hidden" name="ujian_id" value={ujianId} />
+              <input type="number" name="menit" min={1} max={120} defaultValue={5} aria-label="Menit" className={kelasInputMenit} />
+              <TombolKonfirmasi
+                teks="+ Waktu Semua"
+                pesanKonfirmasi="Tambah waktu untuk semua siswa yang masih mengerjakan?"
+                jenis="kedua"
+                className="whitespace-nowrap py-3 px-4"
+              />
+            </form>
           )}
           {ujian.status === "berjalan" && (
             <form action={akhiriUjian}>
@@ -193,6 +229,11 @@ async function RuangKontrol({
                           {jumlahTerjawabPerPeserta.get(p.id) ?? 0}/{jumlahSoal ?? 0} terjawab
                         </span>
                       )}
+                      {p.tambahan_waktu > 0 && (
+                        <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                          +{p.tambahan_waktu} mnt
+                        </span>
+                      )}
                       {p.jumlah_pelanggaran > 0 && (
                         <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium">
                           {p.jumlah_pelanggaran} pelanggaran
@@ -202,9 +243,9 @@ async function RuangKontrol({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {ujian.status === "lobby" && (
-                    <form action={setujuiPeserta} className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {(ujian.status === "lobby" || (ujian.status === "berjalan" && !p.disetujui)) && (
+                    <form action={setujuiPeserta}>
                       <input type="hidden" name="ujian_id" value={ujianId} />
                       <input type="hidden" name="peserta_id" value={p.id} />
                       <input type="hidden" name="setujui" value={p.disetujui ? "false" : "true"} />
@@ -216,12 +257,60 @@ async function RuangKontrol({
                     </form>
                   )}
 
+                  {ujian.status === "lobby" && (
+                    <form action={tolakPeserta}>
+                      <input type="hidden" name="ujian_id" value={ujianId} />
+                      <input type="hidden" name="peserta_id" value={p.id} />
+                      <TombolKonfirmasi
+                        teks="Tolak"
+                        pesanKonfirmasi={`Tolak ${siswaData?.nama ?? "siswa ini"}? Nama akan bisa dipilih lagi.`}
+                        jenis="bahaya"
+                        className="text-xs py-1.5 px-3"
+                      />
+                    </form>
+                  )}
+
                   {p.status === "terkunci" && (
                     <form action={beriKodeBuka}>
                       <input type="hidden" name="ujian_id" value={ujianId} />
                       <input type="hidden" name="peserta_id" value={p.id} />
                       <Tombol teks="Beri Kode Buka" jenis="bahaya" className="text-xs py-1.5 px-3" />
                     </form>
+                  )}
+
+                  {(ujian.status === "lobby" || ujian.status === "berjalan") && (
+                    <details className="relative">
+                      <summary className="cursor-pointer list-none rounded-lg px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100">
+                        Lainnya ▾
+                      </summary>
+                      <div className="absolute right-0 z-10 mt-1 w-64 space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                        {ujian.status === "berjalan" && (p.status === "mengerjakan" || p.status === "terkunci") && (
+                          <form action={tambahWaktu} className="flex items-center gap-2">
+                            <input type="hidden" name="ujian_id" value={ujianId} />
+                            <input type="hidden" name="peserta_id" value={p.id} />
+                            <input type="number" name="menit" min={1} max={120} defaultValue={5} aria-label="Menit" className={kelasInputMenit} />
+                            <span className="text-xs text-gray-600">menit</span>
+                            <TombolKonfirmasi
+                              teks="+ Waktu"
+                              pesanKonfirmasi={`Tambah waktu untuk ${siswaData?.nama ?? "siswa ini"}?`}
+                              jenis="kedua"
+                              className="text-xs py-1.5 px-3"
+                            />
+                          </form>
+                        )}
+                        <form action={resetPerangkat} className="space-y-1">
+                          <input type="hidden" name="ujian_id" value={ujianId} />
+                          <input type="hidden" name="peserta_id" value={p.id} />
+                          <TombolKonfirmasi
+                            teks="Reset Perangkat / Nama"
+                            pesanKonfirmasi={`Lepas HP ${siswaData?.nama ?? "siswa ini"}? Nama bisa dipilih lagi dari HP lain dan perlu disetujui ulang. Jawaban tetap tersimpan.`}
+                            jenis="kedua"
+                            className="w-full text-xs py-1.5 px-3"
+                          />
+                          <p className="text-xs text-gray-500">Untuk HP rusak/ganti HP, atau nama dipilih orang yang salah.</p>
+                        </form>
+                      </div>
+                    </details>
                   )}
                 </div>
               </div>
@@ -239,7 +328,7 @@ export default function LobbyPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; kode_buka?: string; nama?: string }>;
+  searchParams: Promise<ParamRuangKontrol>;
 }) {
   return (
     <Suspense fallback={<p className="text-gray-500">Memuat ruang kontrol...</p>}>
@@ -253,7 +342,7 @@ async function HalamanLobby({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; kode_buka?: string; nama?: string }>;
+  searchParams: Promise<ParamRuangKontrol>;
 }) {
   const { id } = await params;
   return (
