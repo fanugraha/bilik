@@ -1,12 +1,27 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { deleteUjian } from "@/actions/ujian";
-import { Tombol } from "@/components/ui/button";
+import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
+import { KepalaHalaman } from "@/components/ui/kepala-halaman";
+import { KeadaanKosong } from "@/components/ui/keadaan-kosong";
+import { LencanaStatusUjian } from "@/components/ui/lencana";
+import { TautanTombol } from "@/components/ui/tautan-tombol";
+
+export const metadata: Metadata = { title: "Ujian" };
+
+function aksiUtamaUjian(ujian: { id: string; status: string }) {
+  if (ujian.status === "draft") return { href: `/dashboard/ujian/${ujian.id}/soal`, teks: "Atur soal" };
+  if (ujian.status === "lobby" || ujian.status === "berjalan") return { href: `/dashboard/ujian/${ujian.id}/lobby`, teks: "Ruang kontrol" };
+  return { href: `/dashboard/ujian/${ujian.id}/nilai`, teks: "Lihat nilai" };
+}
+
+const formatTanggal = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" });
 
 async function DaftarUjian({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await connection();
@@ -19,105 +34,87 @@ async function DaftarUjian({ searchParams }: { searchParams: Promise<{ error?: s
 
   const { data: listUjian, error: errorList } = await supabase
     .from("ujian")
-    .select("id, judul, mapel, durasi, status, created_at")
+    .select("id, judul, mapel, durasi, status, created_at, ujian_soal(count)")
     .eq("guru_id", user.id)
     .order("created_at", { ascending: false });
 
   const { error: errorQuery } = await searchParams;
 
-  const statusLabel = (status: string) => {
-    switch (status) {
-      case "draft":
-        return { teks: "Draft", warna: "bg-gray-100 text-gray-800" };
-      case "lobby":
-        return { teks: "Lobby", warna: "bg-blue-100 text-blue-800" };
-      case "berjalan":
-        return { teks: "Berjalan", warna: "bg-green-100 text-green-800" };
-      case "selesai":
-        return { teks: "Selesai", warna: "bg-yellow-100 text-yellow-800" };
-      case "dinilai":
-        return { teks: "Dinilai", warna: "bg-purple-100 text-purple-800" };
-      default:
-        return { teks: status, warna: "bg-gray-100 text-gray-800" };
-    }
-  };
-
   return (
-    <>
+    <div className="space-y-4">
       {errorQuery && <Pesan jenis="error">{errorQuery}</Pesan>}
 
-      <div className="sticky top-0 z-10 bg-white border-b pb-4">
-        <Link href="/dashboard/ujian/buat">
-          <Tombol teks="+ Buat Ujian Baru" jenis="utama" />
-        </Link>
-      </div>
-
-      <Kartu>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Daftar Ujian</h2>
+      <Kartu tanpaPadding>
         {errorList ? (
-          <Pesan jenis="error">{errorList.message}</Pesan>
-        ) : listUjian?.length === 0 ? (
-          <p className="text-sm text-gray-500">Belum ada ujian. Buat yang pertama sekarang!</p>
+          <div className="p-5">
+            <Pesan jenis="error">{errorList.message}</Pesan>
+          </div>
+        ) : (listUjian ?? []).length === 0 ? (
+          <KeadaanKosong
+            ikon="ujian"
+            judul="Belum ada ujian"
+            deskripsi="Buat ujian, pilih soal dari bank soal, lalu buka lobby saat kelas siap."
+            aksi={<TautanTombol href="/dashboard/ujian/buat" teks="Buat ujian" jenis="utama" ikon="tambah" />}
+          />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {listUjian?.map((ujian) => {
-              const { teks, warna } = statusLabel(ujian.status);
+          <ul className="divide-y divide-garis">
+            {(listUjian ?? []).map((ujian) => {
+              const aksi = aksiUtamaUjian(ujian);
+              const jumlahSoal = (ujian.ujian_soal as { count: number }[])[0]?.count ?? 0;
               return (
-                <div
-                  key={ujian.id}
-                  className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between">
-                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${warna}`}>
-                      {teks}
+                <li key={ujian.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <Link href={aksi.href} className="group min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-semibold text-tinta group-hover:text-nila">{ujian.judul}</span>
+                      <LencanaStatusUjian status={ujian.status} />
                     </span>
-                    <span className="text-xs text-gray-500">{ujian.durasi} menit</span>
-                  </div>
-                  <h3 className="mt-2 text-base font-semibold text-gray-900 line-clamp-1">{ujian.judul}</h3>
-                  {ujian.mapel && <p className="text-xs text-gray-600 mt-1">{ujian.mapel}</p>}
-                  <div className="mt-3 flex gap-2">
-                    {ujian.status === "draft" ? (
-                      <Link href={`/dashboard/ujian/${ujian.id}/soal`} className="flex-1">
-                        <Tombol teks="Atur Soal" jenis="utama" />
-                      </Link>
-                    ) : ujian.status === "lobby" || ujian.status === "berjalan" ? (
-                      <Link href={`/dashboard/ujian/${ujian.id}/lobby`} className="flex-1">
-                        <Tombol teks="Ruang Kontrol" jenis="utama" />
-                      </Link>
-                    ) : (
-                      <Link href={`/dashboard/ujian/${ujian.id}/nilai`} className="flex-1">
-                        <Tombol teks="Lihat Nilai" jenis="kedua" />
-                      </Link>
-                    )}
+                    <span className="mt-0.5 block text-sm text-tinta-2">
+                      {[ujian.mapel, `${jumlahSoal} soal`, `${ujian.durasi} menit`, formatTanggal.format(new Date(ujian.created_at))]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  </Link>
+                  <div className="flex shrink-0 items-center gap-1">
                     {ujian.status === "draft" && (
-                      <form className="flex-1">
+                      <form action={deleteUjian}>
                         <input type="hidden" name="id" value={ujian.id} />
-                        <Tombol teks="Hapus" jenis="bahaya" formAction={deleteUjian} />
+                        <TombolKonfirmasi
+                          teks="Hapus"
+                          jenis="hantu"
+                          ukuran="kecil"
+                          pesanKonfirmasi={`Hapus draft ujian "${ujian.judul}"?`}
+                          className="hover:text-merah"
+                        />
                       </form>
                     )}
+                    <TautanTombol
+                      href={aksi.href}
+                      teks={aksi.teks}
+                      jenis={ujian.status === "lobby" || ujian.status === "berjalan" ? "utama" : "kedua"}
+                      ukuran="kecil"
+                    />
                   </div>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </Kartu>
-    </>
+    </div>
   );
 }
 
 export default function UjianPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
-      <div className="mb-4 sm:mb-6 flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Kelola Ujian</h1>
-        <Link href="/dashboard" className="text-sm text-indigo-600 hover:underline">
-          ← Kembali ke Dashboard
-        </Link>
-      </div>
-      <Suspense fallback={<p className="text-gray-500">Memuat...</p>}>
+    <>
+      <KepalaHalaman
+        judul="Ujian"
+        deskripsi="Alur ujian: draft, lobby dibuka, berjalan, selesai, lalu dinilai."
+        aksi={<TautanTombol href="/dashboard/ujian/buat" teks="Buat ujian" jenis="utama" ikon="tambah" />}
+      />
+      <Suspense fallback={<p className="text-sm text-tinta-2">Memuat ujian...</p>}>
         <DaftarUjian searchParams={searchParams} />
       </Suspense>
-    </main>
+    </>
   );
 }

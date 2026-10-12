@@ -75,6 +75,13 @@ export async function simpanSkorEssay(formData: FormData) {
   }
 
   revalidatePath(`/dashboard/ujian/${ujianId}/nilai`);
+
+  // Tombol "Simpan & lanjut" mengirim id peserta berikutnya
+  const pesertaBerikutnya = formData.get("lanjut_ke") as string | null;
+  if (pesertaBerikutnya && rekap.listBaris.some((baris) => baris.pesertaId === pesertaBerikutnya)) {
+    redirect(`/dashboard/ujian/${ujianId}/nilai/${pesertaBerikutnya}?sukses=` + encodeURIComponent(`Skor ${peserta.nama} tersimpan`));
+  }
+
   redirect(halamanKoreksi + "?sukses=" + encodeURIComponent("Skor essay tersimpan"));
 }
 
