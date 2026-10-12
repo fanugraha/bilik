@@ -6,6 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../components/kartu.dart';
+import '../../components/lencana.dart';
+import '../../components/pesan.dart';
+import '../../core/theme.dart';
 import '../../models/jawaban.dart';
 import '../../models/soal.dart';
 import '../../providers/app_providers.dart';
@@ -77,8 +81,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       return;
     }
     _token = token;
-    final sesi = await SessionStore.getSession();
-    _pesertaId = sesi['pesertaId'];
+    _pesertaId = (await SessionStore.getSession())['pesertaId'];
 
     try {
       final hasil = await ApiSiswa.soal(token);
@@ -89,9 +92,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         final indeks = List<int>.generate(s.opsi.length, (i) => i);
         if (hasil.acakOpsi) indeks.shuffle(Random(token.hashCode ^ s.id.hashCode));
         _urutanOpsi[s.id] = indeks;
-        if (s.isEssay) {
-          _ctrl[s.id] = TextEditingController(text: '');
-        }
+        if (s.isEssay) _ctrl[s.id] = TextEditingController();
       }
       for (final j in hasil.jawaban) {
         _isi[j.soalId] = j.isi;
@@ -115,22 +116,20 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Gagal memuat soal. Cek sambungan lalu coba lagi.';
+        _error = 'Gagal memuat soal. Periksa sambungan lalu coba lagi.';
         _memuat = false;
       });
     }
   }
 
   void _detik() {
-    if (_deadline == null) return;
-    final sisa = _deadline!.difference(DateTime.now());
-    if (mounted) setState(() => _sisa = sisa.isNegative ? Duration.zero : sisa);
-    if (!_menyimpan) return;
-    if (ref.read(autosaveServiceProvider).pendingCount == 0 && mounted) {
-      setState(() => _menyimpan = false);
+    if (_deadline != null) {
+      final sisa = _deadline!.difference(DateTime.now());
+      if (mounted) setState(() => _sisa = sisa.isNegative ? Duration.zero : sisa);
+      if (sisa.isNegative && !_selesai && !_mengirim) _kumpulkan(paksa: true);
     }
-    if (sisa.isNegative && !_selesai && !_mengirim) {
-      _kumpulkan(paksa: true);
+    if (_menyimpan && ref.read(autosaveServiceProvider).pendingCount == 0 && mounted) {
+      setState(() => _menyimpan = false);
     }
   }
 
@@ -166,7 +165,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Kumpulkan jawaban?'),
-          content: const Text('Jawaban yang sudah dikumpulkan tidak bisa diubah lagi.'),
+          content: const Text('Jawaban tidak bisa diubah lagi setelah dikumpulkan.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Kumpulkan')),
@@ -188,7 +187,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       if (!mounted) return;
       setState(() => _mengirim = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal mengirim. Cek sambungan lalu coba lagi.')),
+        const SnackBar(content: Text('Gagal mengirim. Periksa sambungan lalu coba lagi.')),
       );
     }
   }
@@ -196,15 +195,12 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   String _formatSisa(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final jam = d.inHours;
-    return jam > 0 ? '$jam:$m:$s' : '$m:$s';
+    return d.inHours > 0 ? '${d.inHours}:$m:$s' : '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_memuat) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    if (_memuat) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_error != null) {
       return Scaffold(
         body: Center(
@@ -213,7 +209,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_error!, textAlign: TextAlign.center),
+                Pesan(_error!, jenis: JenisPesan.error),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () {
@@ -236,57 +232,84 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     }
 
     final soal = _soal[_index];
-    final sudahRagu = _ragu[soal.id] ?? false;
-
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text('Soal ${_index + 1} / ${_soal.length}'),
-        actions: [
-          Center(child: Text(_formatSisa(_sisa), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          const SizedBox(width: 12),
+        title: Text('Soal ${_index + 1} dari ${_soal.length}'),
+        actions: [Padding(padding: const EdgeInsets.only(right: 12), child: Center(child: _pilTimer()))],
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
+      ),
+      body: Column(
+        children: [
+          _bilahStatus(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                _nomorSoal(),
+                const SizedBox(height: 16),
+                _kartuSoal(soal),
+              ],
+            ),
+          ),
+          _navigasi(soal),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _bilahStatus(),
-            _nomorSoal(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(soal.teks, style: const TextStyle(fontSize: 16, height: 1.4)),
-                    const SizedBox(height: 16),
-                    _jawabanSoal(soal),
-                  ],
-                ),
-              ),
+    );
+  }
+
+  Widget _pilTimer() {
+    final rendah = _sisa.inSeconds <= 60;
+    final warna = rendah ? BilikWarna.merah : BilikWarna.nila;
+    final latar = rendah ? BilikWarna.merahMuda : BilikWarna.nilaMuda;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: latar, borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, size: 16, color: warna),
+          const SizedBox(width: 6),
+          Text(
+            _formatSisa(_sisa),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: warna,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
-            _navigasi(soal, sudahRagu),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _bilahStatus() {
-    final tema = Theme.of(context);
-    final teks = _offline ? 'Offline' : (_menyimpan ? 'Menyimpan…' : 'Tersimpan');
-    final ikon = _offline ? Icons.cloud_off : (_menyimpan ? Icons.sync : Icons.cloud_done);
-    final warna = _offline ? tema.colorScheme.error : tema.colorScheme.primary;
+    final IconData ikon;
+    final String teks;
+    final Color warna;
+    if (_offline) {
+      ikon = Icons.cloud_off;
+      teks = 'Offline, jawaban tersimpan di perangkat';
+      warna = BilikWarna.kuning;
+    } else if (_menyimpan) {
+      ikon = Icons.sync;
+      teks = 'Menyimpan…';
+      warna = BilikWarna.tinta2;
+    } else {
+      ikon = Icons.cloud_done;
+      teks = 'Tersimpan';
+      warna = BilikWarna.hijau;
+    }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: tema.colorScheme.surfaceContainerHighest,
+      width: double.infinity,
+      color: BilikWarna.permukaan,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Icon(ikon, size: 16, color: warna),
+          Icon(ikon, size: 14, color: warna),
           const SizedBox(width: 6),
-          Text(teks, style: TextStyle(fontSize: 12, color: warna)),
+          Text(teks, style: TextStyle(fontSize: 12, color: warna, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -294,38 +317,46 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   Widget _nomorSoal() {
     return SizedBox(
-      height: 52,
+      height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: _soal.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
           final s = _soal[i];
           final aktif = i == _index;
-          final dijawab = _isi[s.id] != null && _isi[s.id]!.isNotEmpty;
+          final dijawab = (_isi[s.id] ?? '').isNotEmpty;
           final ragu = _ragu[s.id] ?? false;
-          final warna = aktif
-              ? Theme.of(context).colorScheme.primary
-              : ragu
-                  ? Colors.orange
-                  : dijawab
-                      ? Colors.green.shade300
-                      : Theme.of(context).colorScheme.surfaceContainerHighest;
+
+          late final Color latar;
+          late final Color batas;
+          late final Color teks;
+          if (aktif) {
+            latar = BilikWarna.nila;
+            batas = BilikWarna.nila;
+            teks = Colors.white;
+          } else if (ragu) {
+            latar = BilikWarna.kuningMuda;
+            batas = BilikWarna.kuning;
+            teks = BilikWarna.kuning;
+          } else if (dijawab) {
+            latar = BilikWarna.hijauMuda;
+            batas = BilikWarna.hijau;
+            teks = BilikWarna.hijau;
+          } else {
+            latar = BilikWarna.permukaan;
+            batas = BilikWarna.garisTegas;
+            teks = BilikWarna.tinta2;
+          }
+
           return InkWell(
             onTap: () => setState(() => _index = i),
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              width: 36,
+              width: 40,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: warna, borderRadius: BorderRadius.circular(8)),
-              child: Text(
-                '${i + 1}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: aktif || ragu || dijawab ? Colors.white : null,
-                ),
-              ),
+              decoration: BoxDecoration(color: latar, border: Border.all(color: batas), borderRadius: BorderRadius.circular(8)),
+              child: Text('${i + 1}', style: TextStyle(fontWeight: FontWeight.w700, color: teks)),
             ),
           );
         },
@@ -333,83 +364,165 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     );
   }
 
+  Widget _kartuSoal(Soal soal) {
+    return Kartu(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              _lencanaTipe(soal.tipe),
+              const Spacer(),
+              Text('Bobot ${soal.bobot}', style: const TextStyle(fontSize: 12, color: BilikWarna.tinta2)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(soal.teks, style: const TextStyle(fontSize: 16, height: 1.5)),
+          const SizedBox(height: 18),
+          _jawabanSoal(soal),
+        ],
+      ),
+    );
+  }
+
+  Widget _lencanaTipe(String tipe) {
+    switch (tipe) {
+      case 'pg':
+        return const Lencana('Pilihan ganda', nada: NadaLencana.nila);
+      case 'benar_salah':
+        return const Lencana('Benar / Salah', nada: NadaLencana.hijau);
+      default:
+        return const Lencana('Essay', nada: NadaLencana.kuning);
+    }
+  }
+
   Widget _jawabanSoal(Soal soal) {
     if (soal.isPg) {
       final urutan = _urutanOpsi[soal.id] ?? List<int>.generate(soal.opsi.length, (i) => i);
-      return RadioGroup<String>(
-        groupValue: _isi[soal.id],
-        onChanged: (v) => _jawab(soal, v),
-        child: Column(
-          children: [
-            for (final i in urutan)
-              RadioListTile<String>(
-                value: _hurufOpsi(i),
-                title: Text('${_hurufOpsi(i)}. ${soal.opsi[i]}'),
-                contentPadding: EdgeInsets.zero,
-              ),
-          ],
-        ),
+      return Column(
+        children: [
+          for (final i in urutan)
+            _opsiTile(huruf: _hurufOpsi(i), teks: soal.opsi[i], dipilih: _isi[soal.id] == _hurufOpsi(i)),
+        ],
       );
     }
     if (soal.isBenarSalah) {
-      return RadioGroup<String>(
-        groupValue: _isi[soal.id],
-        onChanged: (v) => _jawab(soal, v),
-        child: const Column(
-          children: [
-            RadioListTile<String>(value: 'benar', title: Text('Benar'), contentPadding: EdgeInsets.zero),
-            RadioListTile<String>(value: 'salah', title: Text('Salah'), contentPadding: EdgeInsets.zero),
-          ],
-        ),
+      return Column(
+        children: [
+          _opsiTile(huruf: 'B', teks: 'Benar', dipilih: _isi[soal.id] == 'benar', nilai: 'benar'),
+          _opsiTile(huruf: 'S', teks: 'Salah', dipilih: _isi[soal.id] == 'salah', nilai: 'salah'),
+        ],
       );
     }
     return TextField(
       controller: _ctrl[soal.id],
       maxLines: 8,
       minLines: 5,
-      decoration: const InputDecoration(hintText: 'Tulis jawaban Anda', border: OutlineInputBorder()),
+      decoration: const InputDecoration(hintText: 'Tulis jawaban Anda', alignLabelWithHint: true),
       onChanged: (v) => _jawab(soal, v),
     );
   }
 
-  Widget _navigasi(Soal soal, bool sudahRagu) {
+  Widget _opsiTile({required String huruf, required String teks, required bool dipilih, String? nilai}) {
     return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          OutlinedButton.icon(
-            onPressed: () => _toggleRagu(soal),
-            icon: Icon(sudahRagu ? Icons.flag : Icons.outlined_flag),
-            label: Text(sudahRagu ? 'Tandai ragu (aktif)' : 'Tandai ragu-ragu'),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => _pilihOpsi(nilai ?? huruf),
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: dipilih ? BilikWarna.nilaMuda : BilikWarna.permukaan,
+            border: Border.all(color: dipilih ? BilikWarna.nila : BilikWarna.garisTegas, width: dipilih ? 1.5 : 1),
+            borderRadius: BorderRadius.circular(8),
           ),
-          const SizedBox(height: 8),
-          Row(
+          child: Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _index > 0 ? () => setState(() => _index--) : null,
-                  icon: const Icon(Icons.chevron_left),
-                  label: const Text('Sebelumnya'),
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: dipilih ? BilikWarna.nila : BilikWarna.kertas,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  huruf,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: dipilih ? Colors.white : BilikWarna.tinta2),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _index < _soal.length - 1
-                    ? FilledButton.icon(
-                        onPressed: () => setState(() => _index++),
-                        icon: const Icon(Icons.chevron_right),
-                        label: const Text('Berikutnya'),
-                      )
-                    : FilledButton.icon(
-                        onPressed: _mengirim ? null : () => _kumpulkan(),
-                        icon: const Icon(Icons.check),
-                        label: Text(_mengirim ? 'Mengirim…' : 'Kumpulkan'),
-                      ),
+              const SizedBox(width: 12),
+              Expanded(child: Text(teks, style: const TextStyle(fontSize: 15))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _pilihOpsi(String nilai) {
+    final soal = _soal[_index];
+    _jawab(soal, _isi[soal.id] == nilai ? null : nilai);
+  }
+
+  Widget _navigasi(Soal soal) {
+    final sudahRagu = _ragu[soal.id] ?? false;
+    return Container(
+      decoration: const BoxDecoration(
+        color: BilikWarna.permukaan,
+        border: Border(top: BorderSide(color: BilikWarna.garis)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _toggleRagu(soal),
+                  icon: Icon(sudahRagu ? Icons.flag : Icons.outlined_flag, size: 18, color: sudahRagu ? BilikWarna.kuning : null),
+                  label: Text(sudahRagu ? 'Ditandai ragu-ragu' : 'Tandai ragu-ragu'),
+                  style: sudahRagu
+                      ? OutlinedButton.styleFrom(
+                          foregroundColor: BilikWarna.kuning,
+                          side: const BorderSide(color: BilikWarna.kuning),
+                          backgroundColor: BilikWarna.kuningMuda,
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _index > 0 ? () => setState(() => _index--) : null,
+                      icon: const Icon(Icons.chevron_left, size: 20),
+                      label: const Text('Sebelumnya'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _index < _soal.length - 1
+                        ? FilledButton.icon(
+                            onPressed: () => setState(() => _index++),
+                            icon: const Icon(Icons.chevron_right, size: 20),
+                            label: const Text('Berikutnya'),
+                          )
+                        : FilledButton.icon(
+                            onPressed: _mengirim ? null : () => _kumpulkan(),
+                            icon: const Icon(Icons.check, size: 20),
+                            label: Text(_mengirim ? 'Mengirim…' : 'Kumpulkan'),
+                          ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

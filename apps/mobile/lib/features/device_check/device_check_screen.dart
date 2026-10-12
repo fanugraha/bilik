@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../components/kartu.dart';
+import '../../components/pesan.dart';
+import '../../core/theme.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_siswa.dart';
 import '../../services/session_store.dart';
@@ -29,8 +32,7 @@ class _DeviceCheckScreenState extends ConsumerState<DeviceCheckScreen> {
 
   Future<void> _check() async {
     setState(() => _checking = true);
-    final guard = ref.read(examGuardProvider);
-    final ok = await guard.checkPrerequisites();
+    final ok = await ref.read(examGuardProvider).checkPrerequisites();
     if (mounted) {
       setState(() {
         _isReady = ok;
@@ -57,11 +59,7 @@ class _DeviceCheckScreenState extends ConsumerState<DeviceCheckScreen> {
         siswaId: draft.siswaId,
         deviceId: deviceId,
       );
-      await SessionStore.saveSession(
-        pesertaId: hasil.peserta.id,
-        tokenSesi: hasil.tokenSesi,
-        kodeUjian: draft.kode,
-      );
+      await SessionStore.saveSession(pesertaId: hasil.peserta.id, tokenSesi: hasil.tokenSesi, kodeUjian: draft.kode);
       ref.read(tokenSesiProvider.notifier).state = hasil.tokenSesi;
       ref.read(currentPesertaProvider.notifier).state = hasil.peserta;
       if (mounted) context.go('/lobby');
@@ -84,54 +82,90 @@ class _DeviceCheckScreenState extends ConsumerState<DeviceCheckScreen> {
   Widget build(BuildContext context) {
     final draft = ref.watch(joinDraftProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Cek Kesiapan Perangkat')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (draft != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  '${draft.siswaNama} • ${draft.kelasNama}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+      appBar: AppBar(
+        title: const Text('Cek Perangkat'),
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          if (draft != null) ...[
+            Kartu(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_outline, size: 20, color: BilikWarna.tinta2),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(draft.siswaNama, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        Text(draft.kelasNama, style: const TextStyle(fontSize: 12.5, color: BilikWarna.tinta2)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            Icon(
-              _isReady ? Icons.check_circle_outline : Icons.error_outline,
-              size: 72,
-              color: _isReady ? Colors.green : Colors.orange,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _checking
-                  ? 'Memeriksa pengaturan penguncian...'
-                  : _isReady
-                      ? 'Perangkat siap untuk ujian aman.'
-                      : 'Aktifkan Screen Pinning (Android) / Guided Access (iPhone) terlebih dahulu.',
-              textAlign: TextAlign.center,
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ],
-            const SizedBox(height: 24),
-            OutlinedButton(
-              onPressed: _checking || _mendaftar ? null : _check,
-              child: const Text('Periksa Ulang'),
             ),
             const SizedBox(height: 12),
-            FilledButton(
-              onPressed: (_isReady && !_mendaftar) ? _masukLobby : null,
-              child: _mendaftar
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Siap Masuk Lobby'),
-            ),
           ],
-        ),
+          Kartu(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _isReady ? BilikWarna.hijauMuda : BilikWarna.kuningMuda,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isReady ? Icons.verified_user_outlined : Icons.warning_amber_outlined,
+                      size: 44,
+                      color: _isReady ? BilikWarna.hijau : BilikWarna.kuning,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _checking
+                      ? 'Memeriksa pengaturan penguncian…'
+                      : _isReady
+                          ? 'Perangkat siap'
+                          : 'Perangkat belum siap',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _isReady
+                      ? 'Layar akan dikunci selama ujian berlangsung.'
+                      : 'Aktifkan Screen Pinning (Android) atau Guided Access (iPhone) terlebih dahulu.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13.5, color: BilikWarna.tinta2, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                if (_error != null) ...[
+                  Pesan(_error!, jenis: JenisPesan.error),
+                  const SizedBox(height: 12),
+                ],
+                FilledButton(
+                  onPressed: (_isReady && !_mendaftar) ? _masukLobby : null,
+                  child: _mendaftar
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Siap, masuk lobby'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: (_checking || _mendaftar) ? null : _check,
+                  child: const Text('Periksa ulang'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

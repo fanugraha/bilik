@@ -98,7 +98,6 @@ async function pilih(db: SupabaseClient, body: Record<string, unknown>) {
     .maybeSingle();
   if (error) throw error;
   if (!ujian) return balas({ error: "Kode ujian tidak ditemukan" }, 404);
-  if (ujian.status !== "lobby") return balas({ error: "Ujian sudah dimulai atau belum dibuka" }, 409);
 
   const { data: relasi } = await db
     .from("ujian_kelas")
@@ -131,6 +130,11 @@ async function pilih(db: SupabaseClient, body: Record<string, unknown>) {
       });
     }
     return balas({ error: "Nama ini sudah dipakai di perangkat lain. Minta guru mereset perangkat." }, 409);
+  }
+
+  // Peserta baru / setelah reset perangkat: boleh masuk saat ujian lobby atau berjalan.
+  if (ujian.status !== "lobby" && ujian.status !== "berjalan") {
+    return balas({ error: "Ujian belum dibuka atau sudah selesai" }, 409);
   }
 
   const token = crypto.randomUUID().replace(/-/g, "");

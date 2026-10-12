@@ -16,10 +16,24 @@ export async function setujuiPeserta(formData: FormData) {
   const ujianId = formData.get("ujian_id") as string;
   const setujui = formData.get("setujui") === "true";
 
-  const { error } = await supabase
-    .from("peserta")
-    .update({ disetujui: setujui })
-    .eq("id", pesertaId);
+  const { data: ujian } = await supabase
+    .from("ujian")
+    .select("status, selesai_at")
+    .eq("id", ujianId)
+    .eq("guru_id", user.id)
+    .single();
+
+  if (!ujian) redirect("/dashboard/ujian");
+
+  const perubahan: Record<string, unknown> = { disetujui: setujui };
+  // Murid yang telat masuk saat ujian sudah berjalan: setujui = langsung mulai.
+  if (setujui && ujian.status === "berjalan") {
+    perubahan.status = "mengerjakan";
+    perubahan.mulai_at = new Date().toISOString();
+    perubahan.selesai_at = ujian.selesai_at ?? new Date(Date.now() + 60 * 60000).toISOString();
+  }
+
+  const { error } = await supabase.from("peserta").update(perubahan).eq("id", pesertaId);
 
   if (error) redirect(`/dashboard/ujian/${ujianId}/lobby?error=` + encodeURIComponent(error.message));
 

@@ -45,6 +45,8 @@ dependencies:
   shared_preferences: ^2.3.3
   # Indikator koneksi
   connectivity_plus: ^6.1.0
+  # Tipografi Plus Jakarta Sans (sama dengan dashboard guru)
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
