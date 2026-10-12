@@ -12,10 +12,14 @@ async function FormLogin({
   const { error } = await searchParams;
 
   return (
-    <>
-      {error && <Pesan jenis="error">{error}</Pesan>}
+    <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+      {error && (
+        <div className="mb-6">
+          <Pesan jenis="error">{error}</Pesan>
+        </div>
+      )}
 
-      <form className="flex flex-col gap-4">
+      <form className="flex flex-col gap-5">
         <KotakInput
           nama="email"
           label="Email"
@@ -36,12 +40,12 @@ async function FormLogin({
           tipe="text"
           placeholder="Nama Anda"
         />
-        <div className="flex gap-3">
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
           <Tombol teks="Masuk" jenis="utama" formAction={login} />
           <Tombol teks="Daftar" jenis="kedua" formAction={signup} />
         </div>
       </form>
-    </>
+    </div>
   );
 }
 
@@ -51,11 +55,13 @@ export default function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Bilik</h1>
-          <p className="mt-2 text-sm text-gray-600">
+        <div className="mb-10 text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            Dashboard Bilik
+          </h1>
+          <p className="mt-3 text-gray-600">
             Masuk atau daftar sebagai guru
           </p>
         </div>

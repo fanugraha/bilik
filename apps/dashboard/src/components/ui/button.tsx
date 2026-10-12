@@ -16,7 +16,7 @@ export function Tombol({ teks, jenis = "utama", formAction }: TombolProps) {
   return (
     <button
       formAction={formAction}
-      className={`rounded-lg px-4 py-2 font-medium ${warnaTombol[jenis]}`}
+      className={`w-full rounded-lg px-4 py-2.5 font-medium transition-colors ${warnaTombol[jenis]}`}
     >
       {teks}
     </button>

@@ -15,7 +15,7 @@ const warnaPesan: Record<JenisPesan, string> = {
 
 export function Pesan({ children, jenis = "error" }: PesanProps) {
   return (
-    <div className={`rounded-lg border p-4 ${warnaPesan[jenis]}`}>
+    <div className={`rounded-lg border p-4 text-sm ${warnaPesan[jenis]}`}>
       {children}
     </div>
   );
