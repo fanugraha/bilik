@@ -13,6 +13,6 @@ import 'package:bilik_mobile/app.dart';
 void main() {
   testWidgets('App tampil', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: BilikApp()));
-    expect(find.text('Masukkan 6 Karakter Kode Ujian'), findsOneWidget);
+    expect(find.text('Masukkan Kode Ujian'), findsOneWidget);
   });
 }
