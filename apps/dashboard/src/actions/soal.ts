@@ -7,6 +7,14 @@ import { amankanTujuanKembali } from "@/lib/alur";
 
 const HURUF_OPSI = ["A", "B", "C", "D", "E"];
 
+// Rapikan teks soal: samakan akhir baris jadi \n lalu potong spasi ujung,
+// agar baris baru yang diketik guru tidak hilang / campur CRLF.
+function rapikanTeks(v: unknown): string {
+  return String(v ?? "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+}
+
 // Opsi harus berurutan (A, B, C, ...). Ada celah (mis. A, B, D) membuat huruf kunci
 // tidak cocok lagi dengan posisi opsi yang tersimpan, jadi ditolak.
 function ambilOpsi(formData: FormData): { opsi: string[]; adaCelah: boolean } {
@@ -14,7 +22,7 @@ function ambilOpsi(formData: FormData): { opsi: string[]; adaCelah: boolean } {
   let sudahKosong = false;
   let adaCelah = false;
   for (const huruf of HURUF_OPSI) {
-    const isi = (formData.get(`opsi_${huruf}`) as string)?.trim();
+    const isi = rapikanTeks(formData.get(`opsi_${huruf}`));
     if (!isi) {
       sudahKosong = true;
       continue;
@@ -43,7 +51,7 @@ async function bankMilik(supabase: Awaited<ReturnType<typeof createClient>>, gur
 // Isian soal sesuai tipe. Kolom milik tipe lain dikosongkan agar soal yang ganti tipe tidak membawa sisa data.
 function susunIsianSoal(formData: FormData): { isian: Record<string, unknown> } | { error: string } {
   const tipe = formData.get("tipe") as string;
-  const teks = (formData.get("teks") as string)?.trim();
+  const teks = rapikanTeks(formData.get("teks"));
   const bobot = parseFloat(formData.get("bobot") as string) || 1;
 
   if (!teks) return { error: "Teks soal wajib diisi" };
@@ -57,10 +65,10 @@ function susunIsianSoal(formData: FormData): { isian: Record<string, unknown> } 
   }
   if (tipe === "benar_salah") {
     const jawabanBenar = formData.get("jawaban_benar") === "true";
-    const penjelasan = (formData.get("penjelasan") as string)?.trim() || null;
+    const penjelasan = rapikanTeks(formData.get("penjelasan")) || null;
     return { isian: { tipe: "benar_salah", teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null } };
   }
-  const pedoman = (formData.get("pedoman") as string)?.trim() || null;
+  const pedoman = rapikanTeks(formData.get("pedoman")) || null;
   return { isian: { tipe: "essay", teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null } };
 }
 

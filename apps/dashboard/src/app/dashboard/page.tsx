@@ -11,6 +11,7 @@ import { LencanaStatusUjian } from "@/components/ui/lencana";
 import { TautanTombol } from "@/components/ui/tautan-tombol";
 import { Pesan } from "@/components/ui/alert";
 import { namaMasihBawaan } from "@/lib/profil";
+import { namaMapel } from "@/lib/mapel";
 import { susunLangkahMulai } from "@/lib/alur";
 
 export const metadata: Metadata = { title: "Beranda" };
@@ -48,7 +49,7 @@ async function IsiBeranda() {
       supabase.from("soal").select("id", { count: "exact", head: true }).eq("guru_id", user.id),
       supabase
         .from("ujian")
-        .select("id, judul, mapel, status, kode, durasi, created_at")
+        .select("id, judul, status, kode, durasi, created_at, mapel_ref:mapel_id(nama)")
         .eq("guru_id", user.id)
         .order("created_at", { ascending: false })
         .limit(8),
@@ -58,7 +59,7 @@ async function IsiBeranda() {
   const daftarKelas = (listKelas ?? []) as { id: string; siswa: { count: number }[] }[];
   const jumlahKelas = daftarKelas.length;
 
-  const semuaUjian = (listUjian ?? []) as UjianRingkas[];
+  const semuaUjian: UjianRingkas[] = (listUjian ?? []).map(({ mapel_ref, ...ujian }) => ({ ...ujian, mapel: namaMapel(mapel_ref) }));
   const listUjianAktif = semuaUjian.filter((ujian) => ujian.status === "lobby" || ujian.status === "berjalan");
   // Ujian aktif sudah tampil sebagai blok pantau di atas, jadi keluar dari daftar agar tidak dobel
   const listUjianLain = semuaUjian.filter((ujian) => ujian.status !== "lobby" && ujian.status !== "berjalan");

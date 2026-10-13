@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { namaMapel } from "@/lib/mapel";
 import { deleteUjian } from "@/actions/ujian";
 import { ambilAksiAlur } from "@/lib/alur";
 import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
@@ -17,7 +18,7 @@ import { TautanTombol } from "@/components/ui/tautan-tombol";
 export const metadata: Metadata = { title: "Ujian" };
 
 function aksiUtamaUjian(ujian: { id: string; status: string }) {
-  if (ujian.status === "draft") return { href: `/dashboard/ujian/${ujian.id}/soal`, teks: "Atur soal" };
+  if (ujian.status === "draft") return { href: `/dashboard/ujian/${ujian.id}/soal`, teks: "Lanjutkan menyiapkan" };
   if (ujian.status === "lobby" || ujian.status === "berjalan") return { href: `/dashboard/ujian/${ujian.id}/lobby`, teks: "Ruang kontrol" };
   return { href: `/dashboard/ujian/${ujian.id}/nilai`, teks: "Lihat nilai" };
 }
@@ -36,7 +37,7 @@ async function IsiUjian({ searchParams }: { searchParams: Promise<{ error?: stri
   const [{ data: listUjian, error: errorList }, { error: errorQuery, status = "" }, aksiLanjut] = await Promise.all([
     supabase
       .from("ujian")
-      .select("id, judul, mapel, durasi, status, created_at, ujian_soal(count)")
+      .select("id, judul, durasi, status, created_at, mapel_ref:mapel_id(nama), ujian_soal(count)")
       .eq("guru_id", user.id)
       .order("created_at", { ascending: false }),
     searchParams,
@@ -124,7 +125,7 @@ async function IsiUjian({ searchParams }: { searchParams: Promise<{ error?: stri
                         <LencanaStatusUjian status={ujian.status} />
                       </span>
                       <span className="mt-0.5 block text-sm text-tinta-2">
-                        {[ujian.mapel, `${jumlahSoal} soal`, `${ujian.durasi} menit`, formatTanggal.format(new Date(ujian.created_at))]
+                        {[namaMapel(ujian.mapel_ref), `${jumlahSoal} soal`, `${ujian.durasi} menit`, formatTanggal.format(new Date(ujian.created_at))]
                           .filter(Boolean)
                           .join(", ")}
                       </span>

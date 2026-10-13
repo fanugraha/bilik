@@ -11,6 +11,7 @@ import {
   mulaiUjian,
   akhiriUjian,
   beriKodeBuka,
+  bukaLangsung,
   tolakPeserta,
   resetPerangkat,
   tambahWaktu,
@@ -241,11 +242,23 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
                       <span className="font-semibold text-tinta">{siswa?.nama}</span>
                       <span className="text-sm text-tinta-2">{peserta.jumlah_pelanggaran} pelanggaran</span>
                     </span>
-                    <form action={beriKodeBuka}>
-                      <input type="hidden" name="ujian_id" value={ujianId} />
-                      <input type="hidden" name="peserta_id" value={peserta.id} />
-                      <Tombol teks="Beri kode buka" jenis="bahaya" ukuran="kecil" teksProses="Membuat kode..." />
-                    </form>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <form action={beriKodeBuka}>
+                        <input type="hidden" name="ujian_id" value={ujianId} />
+                        <input type="hidden" name="peserta_id" value={peserta.id} />
+                        <Tombol teks="Beri kode buka" jenis="kedua" ukuran="kecil" teksProses="Membuat kode..." />
+                      </form>
+                      <form action={bukaLangsung}>
+                        <input type="hidden" name="ujian_id" value={ujianId} />
+                        <input type="hidden" name="peserta_id" value={peserta.id} />
+                        <TombolKonfirmasi
+                          teks="Buka langsung"
+                          jenis="bahaya"
+                          ukuran="kecil"
+                          pesanKonfirmasi={`Buka kunci ${siswa?.nama ?? "siswa ini"} tanpa kode?`}
+                        />
+                      </form>
+                    </div>
                   </li>
                 );
               })}

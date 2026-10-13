@@ -143,14 +143,14 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank, bank
                 />
                 <span className="w-4 text-sm font-semibold text-tinta-2">{huruf}</span>
               </label>
-              <input
-                type="text"
+              <textarea
                 name={`opsi_${huruf}`}
                 required={indeks < 2}
+                rows={1}
                 defaultValue={nilaiAwal?.opsi[indeks] ?? ""}
                 placeholder={indeks < 2 ? `Pilihan ${huruf}` : `Pilihan ${huruf} (opsional)`}
                 aria-label={`Pilihan ${huruf}`}
-                className="bidang"
+                className="bidang resize-y"
               />
             </div>
           ))}

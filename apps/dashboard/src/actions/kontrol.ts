@@ -149,6 +149,35 @@ export async function beriKodeBuka(formData: FormData) {
   );
 }
 
+// Guru membuka kunci siswa langsung (tanpa kode buka). Dipakai bila kode bermasalah.
+export async function bukaLangsung(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const pesertaId = formData.get("peserta_id") as string;
+  const ujianId = formData.get("ujian_id") as string;
+  const halamanLobby = `/dashboard/ujian/${ujianId}/lobby`;
+
+  const peserta = await ambilPesertaMilikGuru(supabase, pesertaId, ujianId, user.id);
+  if (!peserta) redirect(halamanLobby + "?error=" + encodeURIComponent("Peserta tidak ditemukan"));
+  if (peserta.status !== "terkunci") {
+    redirect(halamanLobby + "?error=" + encodeURIComponent("Siswa ini tidak sedang terkunci"));
+  }
+
+  const { error } = await supabase.from("peserta").update({ status: "mengerjakan" }).eq("id", pesertaId);
+  if (error) redirect(halamanLobby + "?error=" + encodeURIComponent(error.message));
+
+  // Kode buka yang belum dipakai dimatikan agar tidak menganggur
+  await supabase.from("kode_buka").update({ dipakai: true }).eq("peserta_id", pesertaId).eq("dipakai", false);
+
+  revalidatePath(halamanLobby);
+  redirect(halamanLobby + "?sukses=" + encodeURIComponent("Kunci dibuka. Minta siswa lanjut mengerjakan."));
+}
+
 const BATAS_TAMBAH_WAKTU_MENIT = 120;
 
 type PesertaMilikGuru = {

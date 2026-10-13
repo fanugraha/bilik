@@ -169,7 +169,7 @@ async function IsiBank({ params, searchParams }: { params: Promise<{ id: string 
                               <LencanaTipeSoal tipe={soal.tipe} />
                               <span className="text-xs text-tinta-2">Bobot {soal.bobot}</span>
                             </span>
-                            <span className="line-clamp-2 text-sm text-tinta group-hover:text-nila">{soal.teks}</span>
+                            <span className="line-clamp-2 whitespace-pre-wrap text-sm text-tinta group-hover:text-nila">{soal.teks}</span>
                           </Link>
                           <div className="flex shrink-0 gap-1">
                             <TautanTombol href={`/dashboard/soal/${soal.id}/ubah`} teks="Ubah" jenis="hantu" ukuran="kecil" />

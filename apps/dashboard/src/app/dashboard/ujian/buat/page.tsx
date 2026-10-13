@@ -7,7 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createUjian } from "@/actions/ujian";
 import { ambilAksiAlur } from "@/lib/alur";
 import { ambilDaftarMapel } from "@/lib/mapel";
-import { IsianUjian } from "@/components/ujian/isian-ujian";
+import { IsianInfoUjian } from "@/components/ujian/isian-ujian";
+import { PenandaLangkah } from "@/components/ujian/penanda-langkah";
+import { Tombol } from "@/components/ui/button";
+import { TautanTombol } from "@/components/ui/tautan-tombol";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
 import { KepalaHalaman } from "@/components/ui/kepala-halaman";
@@ -26,8 +29,7 @@ async function FormUjianBaru({ searchParams }: { searchParams: ParamBuatUjian })
   if (!user) redirect("/login");
 
   const { error: errorQuery, bank } = await searchParams;
-  const [{ data: listKelas }, { data: bankAsal }, daftarMapel, aksiLanjut] = await Promise.all([
-    supabase.from("kelas").select("id, nama").eq("guru_id", user.id).order("nama", { ascending: true }),
+  const [{ data: bankAsal }, daftarMapel, aksiLanjut] = await Promise.all([
     bank
       ? supabase.from("bank_soal").select("id, nama, mapel_id").eq("id", bank).eq("guru_id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -63,13 +65,11 @@ async function FormUjianBaru({ searchParams }: { searchParams: ParamBuatUjian })
       <Kartu>
         <form action={createUjian}>
           {bankAsal && <input type="hidden" name="bank" value={bankAsal.id} />}
-          <IsianUjian
-            listKelas={listKelas ?? []}
-            daftarMapel={daftarMapel}
-            teksSimpan="Lanjut pilih soal"
-            hrefBatal={bankAsal ? `/dashboard/soal/bank/${bankAsal.id}` : "/dashboard/ujian"}
-            mapelIdAwal={bankAsal?.mapel_id ?? undefined}
-          />
+          <IsianInfoUjian daftarMapel={daftarMapel} mapelIdAwal={bankAsal?.mapel_id ?? undefined} />
+          <div className="mt-6 flex flex-row-reverse justify-start gap-2 border-t border-garis pt-5">
+            <Tombol teks="Lanjut: ambil soal" teksProses="Menyimpan..." />
+            <TautanTombol href={bankAsal ? `/dashboard/soal/bank/${bankAsal.id}` : "/dashboard/ujian"} teks="Batal" jenis="hantu" />
+          </div>
         </form>
       </Kartu>
     </>
@@ -81,9 +81,10 @@ export default function BuatUjianPage({ searchParams }: { searchParams: ParamBua
     <div className="max-w-3xl">
       <KepalaHalaman
         judul="Buat ujian"
-        deskripsi="Langkah berikutnya: memilih soal dari bank soal."
+        deskripsi="Isi info singkat dulu. Soal, kelas, dan aturan diatur di langkah berikutnya; semuanya tersimpan sebagai draft."
         kembali={{ href: "/dashboard/ujian", teks: "Semua ujian" }}
       />
+      <PenandaLangkah aktif="info" kondisi={null} />
       <Suspense fallback={<p className="text-sm text-tinta-2">Memuat...</p>}>
         <FormUjianBaru searchParams={searchParams} />
       </Suspense>

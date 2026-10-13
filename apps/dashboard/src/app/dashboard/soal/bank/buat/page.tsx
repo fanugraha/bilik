@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createBank } from "@/actions/bank-soal";
 import { ambilDaftarMapel } from "@/lib/mapel";
@@ -26,6 +27,8 @@ async function PesanAtas({ searchParams }: { searchParams: ParamBuatBank }) {
 }
 
 async function FormBankBaru() {
+  // Data per guru: render saat request, bukan saat prerender
+  await connection();
   const supabase = await createClient();
   const daftarMapel = await ambilDaftarMapel(supabase);
   return (

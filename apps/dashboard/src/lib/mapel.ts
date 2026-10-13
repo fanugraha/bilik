@@ -37,3 +37,8 @@ export async function mapelDariForm(supabase: SupabaseClient, formData: FormData
   if (namaBaru) return { mapel_id: await pastikanMapel(supabase, namaBaru) };
   return uraikanMapel(supabase, (formData.get("mapel_id") as string) || null);
 }
+
+// Nama mapel dari relasi `mapel_ref:mapel_id(nama)`; Supabase bisa mengembalikan objek atau array
+export function namaMapel(relasi: { nama: string } | { nama: string }[] | null | undefined) {
+  return (Array.isArray(relasi) ? relasi[0]?.nama : relasi?.nama) ?? null;
+}
