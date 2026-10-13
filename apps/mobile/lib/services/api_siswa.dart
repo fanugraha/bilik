@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/supabase_client.dart';
@@ -13,6 +15,27 @@ class ApiException implements Exception {
   String toString() => pesan;
 }
 
+/// Pesan error yang bisa dipahami siswa. Pesan dari fungsi `siswa` (field `error`) diutamakan;
+/// tanpa itu (mis. ditolak gateway sebelum fungsi jalan) pesan disusun dari kode status.
+String pesanGalatServer(int status, dynamic details) {
+  var isi = details;
+  if (isi is String && isi.trim().startsWith('{')) {
+    try {
+      isi = jsonDecode(isi);
+    } on FormatException {
+      // Bukan JSON: tampilkan apa adanya di bawah
+    }
+  }
+  if (isi is Map && isi['error'] != null) return isi['error'].toString();
+  if (isi is String && isi.trim().isNotEmpty && !isi.trim().startsWith('{')) return isi.trim();
+
+  if (status == 404) return 'Kode ujian tidak ditemukan. Periksa lagi kodenya ke guru.';
+  if (status == 401 || status == 403) return 'Aplikasi tidak diizinkan oleh server. Perbarui aplikasi lalu coba lagi.';
+  if (status == 429) return 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.';
+  if (status >= 500) return 'Server sedang sibuk atau bermasalah. Coba lagi sebentar lagi.';
+  return 'Permintaan ditolak server (kode $status). Coba lagi atau beri tahu guru.';
+}
+
 /// Satu pintu ke edge function `siswa` (PRD Fase 3).
 /// App siswa tak pernah menyentuh tabel langsung.
 class ApiSiswa {
@@ -23,10 +46,14 @@ class ApiSiswa {
       if (data is Map) return Map<String, dynamic>.from(data);
       throw ApiException('Respons server tidak dikenal');
     } on FunctionException catch (e) {
-      final d = e.details;
-      if (d is Map && d['error'] != null) throw ApiException(d['error'].toString());
-      if (d is String && d.isNotEmpty) throw ApiException(d);
-      throw ApiException('Server menolak permintaan (${e.status})');
+      // Status 0: permintaan tak sampai ke server (jaringan putus)
+      if (e.status == 0) throw ApiException('Gagal terhubung ke server. Periksa koneksi internet lalu coba lagi.');
+      throw ApiException(pesanGalatServer(e.status, e.details));
+    } catch (e) {
+      // Kegagalan jaringan (tidak ada internet, koneksi direset, timeout) sering
+      // terlihat seperti "server menolak". Beri pesan yang lebih tepat.
+      if (e is ApiException) rethrow;
+      throw ApiException('Gagal terhubung ke server. Periksa koneksi internet lalu coba lagi.');
     }
   }
 

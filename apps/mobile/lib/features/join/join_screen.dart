@@ -12,6 +12,7 @@ import '../../models/join.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_siswa.dart';
 import '../../services/session_store.dart';
+import '../../utils/format_kode.dart';
 
 /// Langkah 1: input kode ujian -> pilih kelas -> pilih nama (PRD 5.2).
 class JoinScreen extends ConsumerStatefulWidget {
@@ -116,6 +117,10 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _kodeController,
+                  autocorrect: kodeAutocorrect,
+                  enableSuggestions: kodeEnableSuggestions,
+                  keyboardType: kodeKeyboardType,
+                  inputFormatters: formatterKode(6),
                   textCapitalization: TextCapitalization.characters,
                   maxLength: 6,
                   textAlign: TextAlign.center,

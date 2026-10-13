@@ -17,15 +17,28 @@ class MainActivity : FlutterActivity() {
     private var eventSink: EventChannel.EventSink? = null
     private var aktif = false
     private var dipaku = false
+    // Pinning baru dianggap terpasang setelah siswa menekan "Mengerti" di dialog sistem.
+    private var sudahTerpin = false
     private var laporTerakhir = 0L
+    // Tenggang setelah pinning dinyalakan: dialog pinning sistem ("MENGERTI")
+    // sementara memindah fokus app, jangan dihitung pelanggaran.
+    private var graceUntil = 0L
     private val handler = Handler(Looper.getMainLooper())
 
     // Pemantau: setiap 1 dtk cek apakah screen pinning masih aktif.
+    // Screen pinning berstatus LOCK_TASK_MODE_PINNED (bukan LOCKED, itu mode kios MDM), jadi
+    // yang dilaporkan hanya perpindahan dari terpasang ke NONE. Selama dialog "Mengerti" belum
+    // ditekan statusnya masih NONE, dan itu bukan pelanggaran.
     private val pemantau = object : Runnable {
         override fun run() {
-            if (aktif && dipaku && lockTaskState() != ActivityManager.LOCK_TASK_MODE_LOCKED) {
-                dipaku = false
-                lapor("pinning_released")
+            if (aktif && dipaku) {
+                if (lockTaskState() != ActivityManager.LOCK_TASK_MODE_NONE) {
+                    sudahTerpin = true
+                } else if (sudahTerpin && System.currentTimeMillis() >= graceUntil) {
+                    dipaku = false
+                    sudahTerpin = false
+                    lapor("pinning_released")
+                }
             }
             if (aktif) handler.postDelayed(this, 1000)
         }
@@ -39,6 +52,7 @@ class MainActivity : FlutterActivity() {
                 "canPin" -> result.success(lockTaskState() == ActivityManager.LOCK_TASK_MODE_NONE)
                 "setActive" -> {
                     aktif = call.argument<Boolean>("aktif") ?: false
+                    if (aktif) graceUntil = System.currentTimeMillis() + 4000
                     result.success(null)
                 }
                 "startLock" -> {
@@ -75,7 +89,7 @@ class MainActivity : FlutterActivity() {
     // Murid keluar dari app saat ujian (tombol Home, app lain, dsb).
     override fun onPause() {
         super.onPause()
-        if (aktif) lapor("app_inactive")
+        if (aktif && System.currentTimeMillis() >= graceUntil) lapor("app_inactive")
     }
 
     // Layar dipecah (split-screen) saat ujian.
@@ -87,6 +101,7 @@ class MainActivity : FlutterActivity() {
     // Lapor maksimal sekali per 2 detik agar tidak dobel.
     private fun lapor(jenis: String) {
         val sekarang = System.currentTimeMillis()
+        if (sekarang < graceUntil) return
         if (sekarang - laporTerakhir < 2000) return
         laporTerakhir = sekarang
         eventSink?.success(jenis)
@@ -98,18 +113,22 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun startLockMode() {
+        // Dialog pinning sistem muncul sekali saat pertama; beri tenggang.
+        graceUntil = System.currentTimeMillis() + 4000
         try {
             startLockTask()
         } catch (_: Exception) {
             // Perangkat mungkin belum mengizinkan screen pinning.
         }
         dipaku = true
+        sudahTerpin = false
         handler.removeCallbacks(pemantau)
         handler.postDelayed(pemantau, 1000)
     }
 
     private fun stopLockMode() {
         dipaku = false
+        sudahTerpin = false
         handler.removeCallbacks(pemantau)
         try {
             stopLockTask()

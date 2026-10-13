@@ -8,6 +8,7 @@ import '../../components/pesan.dart';
 import '../../core/theme.dart';
 import '../../services/api_siswa.dart';
 import '../../services/sesi_aktif.dart';
+import '../../utils/format_kode.dart';
 
 /// Layar terkunci bila pelanggaran melewati batas (PRD 5.2 & 6).
 class LockedScreen extends ConsumerStatefulWidget {
@@ -95,6 +96,10 @@ class _LockedScreenState extends ConsumerState<LockedScreen> {
                       children: [
                         TextField(
                           controller: _unlockController,
+                          autocorrect: kodeAutocorrect,
+                          enableSuggestions: kodeEnableSuggestions,
+                          keyboardType: kodeKeyboardType,
+                          inputFormatters: formatterKode(6),
                           textCapitalization: TextCapitalization.characters,
                           maxLength: 6,
                           textAlign: TextAlign.center,
