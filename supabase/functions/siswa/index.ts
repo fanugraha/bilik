@@ -310,27 +310,24 @@ async function lapor(db: SupabaseClient, body: Record<string, unknown>) {
   const sesi = await pesertaDariToken(db, token);
   if (!sesi) return balas({ ditolak: true }, 404);
 
+  // Penambahan hitungan & penguncian ditangani trigger `pelanggaran_masuk` di DB.
   const { error: errorInsert } = await db
     .from("pelanggaran")
     .insert({ peserta_id: sesi.peserta.id, jenis, keterangan, waktu_server: new Date().toISOString() });
   if (errorInsert) throw errorInsert;
 
-  // Jangan tambah hitungan bila sudah selesai.
-  if (sesi.peserta.status === "selesai") {
-    return balas({ ok: true, jumlah_pelanggaran: sesi.peserta.jumlah_pelanggaran, batas: sesi.ujian.batas_pelanggaran, terkunci: false });
-  }
-
-  const batas = sesi.ujian.batas_pelanggaran ?? 3;
-  const jumlah = (sesi.peserta.jumlah_pelanggaran ?? 0) + 1;
-  const terkunci = sesi.peserta.status === "terkunci" || jumlah >= batas;
-
-  const { error: errorUpdate } = await db
+  const { data: peserta } = await db
     .from("peserta")
-    .update({ jumlah_pelanggaran: jumlah, status: terkunci ? "terkunci" : sesi.peserta.status })
-    .eq("id", sesi.peserta.id);
-  if (errorUpdate) throw errorUpdate;
+    .select("jumlah_pelanggaran, status")
+    .eq("id", sesi.peserta.id)
+    .single();
 
-  return balas({ ok: true, jumlah_pelanggaran: jumlah, batas, terkunci });
+  return balas({
+    ok: true,
+    jumlah_pelanggaran: peserta?.jumlah_pelanggaran ?? sesi.peserta.jumlah_pelanggaran,
+    batas: sesi.ujian.batas_pelanggaran ?? 3,
+    terkunci: peserta?.status === "terkunci",
+  });
 }
 
 // Buka kunci dengan kode sekali pakai dari guru (PRD 6).
@@ -342,6 +339,17 @@ async function buka(db: SupabaseClient, body: Record<string, unknown>) {
   const sesi = await pesertaDariToken(db, token);
   if (!sesi) return balas({ ditolak: true }, 404);
   if (sesi.peserta.status !== "terkunci") return balas({ ok: true, status: sesi.peserta.status });
+
+  // Rate limit: maksimal 5 percobaan per menit per peserta.
+  const { count } = await db
+    .from("percobaan_buka")
+    .select("id", { count: "exact", head: true })
+    .eq("peserta_id", sesi.peserta.id)
+    .gte("waktu", new Date(Date.now() - 60000).toISOString());
+  if ((count ?? 0) >= 5) {
+    return balas({ error: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi." }, 429);
+  }
+  await db.from("percobaan_buka").insert({ peserta_id: sesi.peserta.id });
 
   const { data: baris } = await db
     .from("kode_buka")
