@@ -6,6 +6,7 @@ import { CangkangAuth } from "@/components/auth/cangkang-auth";
 import { Pesan } from "@/components/ui/alert";
 import { Tombol } from "@/components/ui/button";
 import { KotakInput } from "@/components/ui/input";
+import { IkonGoogle } from "@/components/ui/ikon-google";
 
 export const metadata: Metadata = { title: "Masuk" };
 
@@ -54,7 +55,7 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ er
         <span className="h-px flex-1 bg-garis" />
       </div>
       <form className="mt-6">
-        <Tombol teks="Masuk dengan Google" jenis="kedua" ikon="google" formAction={loginDenganGoogle} className="w-full" />
+        <Tombol teks="Masuk dengan Google" jenis="kedua" ikonKustom={<IkonGoogle className="h-4 w-4" />} formAction={loginDenganGoogle} className="w-full" />
       </form>
     </CangkangAuth>
   );

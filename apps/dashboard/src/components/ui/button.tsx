@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import type { ReactNode } from "react";
 import { kelasTombol, type JenisTombol, type UkuranTombol } from "@/components/ui/gaya-tombol";
 import { Ikon, type NamaIkon } from "@/components/ui/ikon";
 
@@ -10,6 +11,7 @@ type TombolProps = {
   ukuran?: UkuranTombol;
   formAction?: (formData: FormData) => void | Promise<void>;
   ikon?: NamaIkon;
+  ikonKustom?: ReactNode;
   teksProses?: string;
   disabled?: boolean;
   nama?: string;
@@ -25,6 +27,7 @@ export function Tombol({
   ukuran = "sedang",
   formAction,
   ikon,
+  ikonKustom,
   teksProses = "Memproses...",
   disabled = false,
   nama,
@@ -48,7 +51,7 @@ export function Tombol({
       {sedangProses ? (
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" />
       ) : (
-        ikon && <Ikon nama={ikon} className="h-4 w-4" />
+        ikonKustom ?? (ikon && <Ikon nama={ikon} className="h-4 w-4" />)
       )}
       {sedangProses ? teksProses : teks}
     </button>
