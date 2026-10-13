@@ -98,6 +98,7 @@ export async function simpanPesertaUjian(formData: FormData) {
   const halamanPeserta = (pesan: string) => `/dashboard/ujian/${id}/peserta?error=` + encodeURIComponent(pesan);
   const acakSoal = formData.get("acak_soal") === "true";
   const acakOpsi = formData.get("acak_opsi") === "true";
+  const blokirPelanggaran = formData.get("blokir_pelanggaran") === "true";
   const batasPelanggaran = Math.min(20, Math.max(1, parseInt(formData.get("batas_pelanggaran") as string) || 3));
 
   await pastikanUjianDraft(supabase, id, user.id);
@@ -107,7 +108,7 @@ export async function simpanPesertaUjian(formData: FormData) {
 
   const { error } = await supabase
     .from("ujian")
-    .update({ acak_soal: acakSoal, acak_opsi: acakOpsi, batas_pelanggaran: batasPelanggaran })
+    .update({ acak_soal: acakSoal, acak_opsi: acakOpsi, batas_pelanggaran: batasPelanggaran, blokir_pelanggaran: blokirPelanggaran })
     .eq("id", id)
     .eq("guru_id", user.id);
   if (error) redirect(halamanPeserta(error.message));

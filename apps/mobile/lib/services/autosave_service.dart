@@ -32,7 +32,7 @@ class AutosaveService {
     _pending.clear();
     for (final j in batch) {
       try {
-        await ApiSiswa.simpan(token: token, soalId: j.soalId, isi: j.isi, raguRagu: j.raguRagu);
+        await ApiSiswa.simpan(token: token, soalId: j.soalId, isi: j.isi, alasan: j.alasan, raguRagu: j.raguRagu);
       } catch (_) {
         _pending.putIfAbsent(j.soalId, () => j);
       }

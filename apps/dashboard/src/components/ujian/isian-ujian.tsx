@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { PilihMapel } from "@/components/ui/pilih-mapel";
 import type { MapelRingkas } from "@/lib/mapel";
@@ -49,6 +52,7 @@ export function IsianInfoUjian({
 
 export type NilaiAwalPesertaUjian = {
   batas_pelanggaran: number;
+  blokir_pelanggaran: boolean;
   acak_soal: boolean;
   acak_opsi: boolean;
   listKelasId: string[];
@@ -56,6 +60,7 @@ export type NilaiAwalPesertaUjian = {
 
 // Langkah 3 wizard: siapa yang ikut dan aturan pengawasan
 export function IsianPesertaUjian({ listKelas, nilaiAwal }: { listKelas: Kelas[]; nilaiAwal: NilaiAwalPesertaUjian }) {
+  const [blokir, setBlokir] = useState(nilaiAwal.blokir_pelanggaran);
   return (
     <div className="divide-y divide-garis">
       <section className="pb-6">
@@ -91,24 +96,42 @@ export function IsianPesertaUjian({ listKelas, nilaiAwal }: { listKelas: Kelas[]
 
       <section className="py-6">
         <JudulBagian judul="Pengawasan" />
-        <div className="flex max-w-xs flex-col gap-1.5">
-          <label htmlFor="batas_pelanggaran" className="text-sm font-medium text-tinta">
-            Batas pelanggaran
-          </label>
+        <label className="flex cursor-pointer items-start gap-3">
           <input
-            id="batas_pelanggaran"
-            type="number"
-            name="batas_pelanggaran"
-            min="1"
-            max="20"
-            defaultValue={nilaiAwal.batas_pelanggaran}
-            aria-describedby="batas-bantuan"
-            className="bidang angka"
+            type="checkbox"
+            name="blokir_pelanggaran"
+            value="true"
+            checked={blokir}
+            onChange={(event) => setBlokir(event.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[var(--color-nila)]"
           />
-          <p id="batas-bantuan" className="text-xs text-tinta-2">
-            HP siswa terkunci setelah pindah aplikasi sebanyak ini.
-          </p>
-        </div>
+          <span>
+            <span className="block text-sm font-medium text-tinta">Blokir HP siswa saat melanggar</span>
+            <span className="block text-xs text-tinta-2">
+              Siswa keluar dari aplikasi selama ujian, HP-nya terkunci dan butuh kode buka. Pelanggaran tetap dicatat walau dimatikan.
+            </span>
+          </span>
+        </label>
+        {blokir && (
+          <div className="mt-4 flex max-w-xs flex-col gap-1.5">
+            <label htmlFor="batas_pelanggaran" className="text-sm font-medium text-tinta">
+              Batas pelanggaran
+            </label>
+            <input
+              id="batas_pelanggaran"
+              type="number"
+              name="batas_pelanggaran"
+              min="1"
+              max="20"
+              defaultValue={nilaiAwal.batas_pelanggaran}
+              aria-describedby="batas-bantuan"
+              className="bidang angka"
+            />
+            <p id="batas-bantuan" className="text-xs text-tinta-2">
+              HP siswa terkunci setelah pindah aplikasi sebanyak ini.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="pt-6">

@@ -28,7 +28,7 @@ async function LangkahPeserta({ params, searchParams }: { params: Promise<{ id: 
 
   const { data: ujian } = await supabase
     .from("ujian")
-    .select("id, judul, status, batas_pelanggaran, acak_soal, acak_opsi")
+    .select("id, judul, status, batas_pelanggaran, blokir_pelanggaran, acak_soal, acak_opsi")
     .eq("id", ujianId)
     .eq("guru_id", user.id)
     .single();
@@ -59,6 +59,7 @@ async function LangkahPeserta({ params, searchParams }: { params: Promise<{ id: 
             listKelas={listKelas ?? []}
             nilaiAwal={{
               batas_pelanggaran: ujian.batas_pelanggaran,
+              blokir_pelanggaran: ujian.blokir_pelanggaran,
               acak_soal: ujian.acak_soal,
               acak_opsi: ujian.acak_opsi,
               listKelasId: (listUjianKelas ?? []).map((baris) => baris.kelas_id),

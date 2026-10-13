@@ -35,9 +35,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   static const _huruf = ['A', 'B', 'C', 'D', 'E'];
 
   final _isi = <String, String?>{};
+  final _alasan = <String, String?>{};
   final _ragu = <String, bool>{};
   final _urutanOpsi = <String, List<int>>{};
   final _ctrl = <String, TextEditingController>{};
+  final _ctrlAlasan = <String, TextEditingController>{};
 
   List<Section> _sections = [];
   int _sectionIndex = 0;
@@ -93,6 +95,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     for (final c in _ctrl.values) {
       c.dispose();
     }
+    for (final c in _ctrlAlasan.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -119,13 +124,16 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           }
           _urutanOpsi[s.id] = indeks;
           if (s.isEssay) _ctrl[s.id] = TextEditingController();
+          if (s.isBenarSalah) _ctrlAlasan[s.id] = TextEditingController();
         }
         sections.add(Section(id: sec.id, urutan: sec.urutan, judul: sec.judul, tipe: sec.tipe, soal: list));
       }
       for (final j in hasil.jawaban) {
         _isi[j.soalId] = j.isi;
+        _alasan[j.soalId] = j.alasan;
         _ragu[j.soalId] = j.raguRagu;
         _ctrl[j.soalId]?.text = j.isi ?? '';
+        _ctrlAlasan[j.soalId]?.text = j.alasan ?? '';
       }
       _deadline = hasil.selesaiAt ?? DateTime.now().add(const Duration(minutes: 60));
 
@@ -251,7 +259,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   void _simpanJawaban(Soal soal, String? isi) {
     if (_pesertaId == null) return;
     ref.read(autosaveServiceProvider).record(
-          Jawaban(pesertaId: _pesertaId!, soalId: soal.id, isi: isi, raguRagu: _ragu[soal.id] ?? false),
+          Jawaban(
+            pesertaId: _pesertaId!,
+            soalId: soal.id,
+            isi: isi,
+            alasan: _alasan[soal.id],
+            raguRagu: _ragu[soal.id] ?? false,
+          ),
         );
   }
 
@@ -261,6 +275,14 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       _menyimpan = true;
     });
     _simpanJawaban(soal, isi);
+  }
+
+  void _jawabAlasan(Soal soal, String? teks) {
+    setState(() {
+      _alasan[soal.id] = teks;
+      _menyimpan = true;
+    });
+    _simpanJawaban(soal, _isi[soal.id]);
   }
 
   void _toggleRagu(Soal soal) {
@@ -277,7 +299,19 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     _jawab(soal, _isi[soal.id] == nilai ? null : nilai);
   }
 
+  // Soal Benar/Salah yang sudah dipilih tapi belum diberi alasan.
+  int _benarSalahTanpaAlasan(List<Soal> soal) => soal
+      .where((s) => s.isBenarSalah && (_isi[s.id] ?? '').isNotEmpty && (_alasan[s.id] ?? '').trim().isEmpty)
+      .length;
+
   Future<void> _lanjutBagian() async {
+    final kurang = _benarSalahTanpaAlasan(_soalKini);
+    if (kurang > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lengkapi alasan pada $kurang soal Benar/Salah sebelum lanjut.')),
+      );
+      return;
+    }
     final ya = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -298,6 +332,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   Future<void> _kumpulkan({bool paksa = false}) async {
     if (!paksa) {
+      final kurang = _benarSalahTanpaAlasan(_sections.expand((s) => s.soal).toList());
+      if (kurang > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lengkapi alasan pada $kurang soal Benar/Salah sebelum mengumpulkan.')),
+        );
+        return;
+      }
       final ya = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -411,9 +452,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
                     isi: _isi[soal.id],
                     urutanOpsi: _urutanOpsi[soal.id] ?? List<int>.generate(soal.opsi.length, (i) => i),
                     controller: _ctrl[soal.id],
+                    alasanController: _ctrlAlasan[soal.id],
                     hurufOpsi: _hurufOpsi,
                     onJawab: (v) => _jawab(soal, v),
                     onPilihOpsi: _pilihOpsi,
+                    onAlasan: (v) => _jawabAlasan(soal, v),
                   ),
                 ],
               ),

@@ -14,6 +14,7 @@ export type SoalUjian = {
 export type JawabanPeserta = {
   soalId: string;
   isi: string | null;
+  alasan: string | null;
   skor: number | null;
 };
 
@@ -153,7 +154,7 @@ export async function ambilRekapNilai(
   const listPesertaId = (dataPeserta ?? []).map((peserta) => peserta.id);
 
   const { data: dataJawaban } = listPesertaId.length
-    ? await supabase.from("jawaban").select("peserta_id, soal_id, isi, skor").in("peserta_id", listPesertaId)
+    ? await supabase.from("jawaban").select("peserta_id, soal_id, isi, alasan, skor").in("peserta_id", listPesertaId)
     : { data: [] };
 
   const tipePerSoal = new Map(listSoal.map((soal) => [soal.soalId, soal.tipe]));
@@ -168,6 +169,7 @@ export async function ambilRekapNilai(
       .map((jawaban) => ({
         soalId: jawaban.soal_id,
         isi: jawaban.isi,
+        alasan: jawaban.alasan,
         skor: jawaban.skor === null ? null : Number(jawaban.skor),
       }));
 

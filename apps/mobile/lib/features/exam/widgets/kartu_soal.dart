@@ -13,18 +13,22 @@ class KartuSoal extends StatelessWidget {
     required this.isi,
     required this.urutanOpsi,
     required this.controller,
+    required this.alasanController,
     required this.hurufOpsi,
     required this.onJawab,
     required this.onPilihOpsi,
+    required this.onAlasan,
   });
 
   final Soal soal;
   final String? isi;
   final List<int> urutanOpsi;
   final TextEditingController? controller;
+  final TextEditingController? alasanController;
   final String Function(int indeks) hurufOpsi;
   final ValueChanged<String?> onJawab;
   final ValueChanged<String> onPilihOpsi;
+  final ValueChanged<String?> onAlasan;
 
   @override
   Widget build(BuildContext context) {
@@ -77,9 +81,26 @@ class KartuSoal extends StatelessWidget {
     }
     if (soal.isBenarSalah) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _opsiTile(huruf: 'B', teks: 'Benar', dipilih: isi == 'benar', nilai: 'benar'),
           _opsiTile(huruf: 'S', teks: 'Salah', dipilih: isi == 'salah', nilai: 'salah'),
+          const SizedBox(height: 6),
+          const Text(
+            'Alasan',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: BilikWarna.tinta2),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: alasanController,
+            maxLines: 5,
+            minLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Wajib: jelaskan alasan pernyataan itu benar atau salah',
+              alignLabelWithHint: true,
+            ),
+            onChanged: onAlasan,
+          ),
         ],
       );
     }

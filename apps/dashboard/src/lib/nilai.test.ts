@@ -23,7 +23,7 @@ function baris(partial: Partial<BarisRekap> & Pick<BarisRekap, "pesertaId">): Ba
 }
 
 function jawaban(soalId: string, isi: string | null, skor: number | null): JawabanPeserta {
-  return { soalId, isi, skor };
+  return { soalId, isi, alasan: null, skor };
 }
 
 describe("rekapPerSoal", () => {

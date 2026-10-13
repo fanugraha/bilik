@@ -87,9 +87,10 @@ class ApiSiswa {
     required String token,
     required String soalId,
     String? isi,
+    String? alasan,
     bool raguRagu = false,
   }) async {
-    await _call('simpan', {'token': token, 'soal_id': soalId, 'isi': isi, 'ragu_ragu': raguRagu});
+    await _call('simpan', {'token': token, 'soal_id': soalId, 'isi': isi, 'alasan': alasan, 'ragu_ragu': raguRagu});
   }
 
   static Future<void> submit(String token) async {

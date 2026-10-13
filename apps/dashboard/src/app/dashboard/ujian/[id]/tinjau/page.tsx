@@ -49,7 +49,7 @@ async function LangkahTinjau({ params, searchParams }: { params: Promise<{ id: s
   const [{ data: ujian }, { data: listSoal }, { data: listKelas }, { count: jumlahBagian }] = await Promise.all([
     supabase
       .from("ujian")
-      .select("id, judul, durasi, status, batas_pelanggaran, acak_soal, acak_opsi, mapel_ref:mapel_id(nama)")
+      .select("id, judul, durasi, status, batas_pelanggaran, blokir_pelanggaran, acak_soal, acak_opsi, mapel_ref:mapel_id(nama)")
       .eq("id", ujianId)
       .eq("guru_id", user.id)
       .single(),
@@ -130,7 +130,7 @@ async function LangkahTinjau({ params, searchParams }: { params: Promise<{ id: s
               label="Aturan"
               hrefUbah={`${dasar}/peserta`}
               isi={[
-                `Terkunci setelah ${ujian.batas_pelanggaran} pelanggaran`,
+                ujian.blokir_pelanggaran ? `Terkunci setelah ${ujian.batas_pelanggaran} pelanggaran` : "Blokir saat melanggar dimatikan",
                 ujian.acak_soal ? "urutan soal diacak" : "urutan soal tetap",
                 ujian.acak_opsi ? "pilihan jawaban diacak" : null,
               ]

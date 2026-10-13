@@ -53,7 +53,7 @@ export async function soal(db: SupabaseClient, body: Record<string, unknown>) {
 
   const { data: jawaban } = await db
     .from("jawaban")
-    .select("soal_id, isi, ragu_ragu")
+    .select("soal_id, isi, alasan, ragu_ragu")
     .eq("peserta_id", sesi.peserta.id);
 
   return balas({

@@ -373,15 +373,23 @@ export async function setujuiSemuaPeserta(formData: FormData) {
   const ujianId = formData.get("ujian_id") as string;
   const halamanLobby = `/dashboard/ujian/${ujianId}/lobby`;
 
-  const { data: ujian } = await supabase.from("ujian").select("status").eq("id", ujianId).eq("guru_id", user.id).single();
+  const { data: ujian } = await supabase.from("ujian").select("status, selesai_at").eq("id", ujianId).eq("guru_id", user.id).single();
   if (!ujian) redirect("/dashboard/ujian");
   if (ujian.status !== "lobby" && ujian.status !== "berjalan") {
     redirect(halamanLobby + "?error=" + encodeURIComponent("Ujian sudah selesai"));
   }
 
+  // Saat ujian sudah berjalan, siswa telat yang disetujui langsung mulai mengerjakan.
+  const perubahan: Record<string, unknown> = { disetujui: true };
+  if (ujian.status === "berjalan") {
+    perubahan.status = "mengerjakan";
+    perubahan.mulai_at = new Date().toISOString();
+    perubahan.selesai_at = ujian.selesai_at ?? new Date(Date.now() + 60 * 60000).toISOString();
+  }
+
   const { data: listDisetujui, error } = await supabase
     .from("peserta")
-    .update({ disetujui: true })
+    .update(perubahan)
     .eq("ujian_id", ujianId)
     .eq("disetujui", false)
     .select("id");
@@ -390,4 +398,45 @@ export async function setujuiSemuaPeserta(formData: FormData) {
 
   revalidatePath(halamanLobby);
   redirect(halamanLobby + "?sukses=" + encodeURIComponent(`${listDisetujui?.length ?? 0} siswa disetujui`));
+}
+
+// Buka kunci semua siswa sekaligus (mis. satu kelas kena gangguan). Padanan bulk dari bukaLangsung.
+export async function bukaLangsungSemua(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const ujianId = formData.get("ujian_id") as string;
+  const halamanLobby = `/dashboard/ujian/${ujianId}/lobby`;
+
+  const { data: ujian } = await supabase.from("ujian").select("id").eq("id", ujianId).eq("guru_id", user.id).single();
+  if (!ujian) redirect("/dashboard/ujian");
+
+  const { data: listTerkunci } = await supabase
+    .from("peserta")
+    .select("id")
+    .eq("ujian_id", ujianId)
+    .eq("status", "terkunci");
+
+  if (!listTerkunci || listTerkunci.length === 0) redirect(halamanLobby);
+
+  const { error } = await supabase
+    .from("peserta")
+    .update({ status: "mengerjakan" })
+    .eq("ujian_id", ujianId)
+    .eq("status", "terkunci");
+  if (error) redirect(halamanLobby + "?error=" + encodeURIComponent(error.message));
+
+  // Kode buka yang belum dipakai dimatikan agar tidak menganggur.
+  await supabase
+    .from("kode_buka")
+    .update({ dipakai: true })
+    .eq("dipakai", false)
+    .in("peserta_id", listTerkunci.map((p) => p.id));
+
+  revalidatePath(halamanLobby);
+  redirect(halamanLobby + "?sukses=" + encodeURIComponent(`Kunci ${listTerkunci.length} siswa dibuka. Minta mereka lanjut mengerjakan.`));
 }

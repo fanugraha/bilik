@@ -12,6 +12,7 @@ import {
   akhiriUjian,
   beriKodeBuka,
   bukaLangsung,
+  bukaLangsungSemua,
   tolakPeserta,
   resetPerangkat,
   tambahWaktu,
@@ -208,6 +209,17 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
                     className={kelasTombolPapanKedua}
                   />
                 </form>
+                {jumlahMenungguPersetujuan > 0 && (
+                  <form action={setujuiSemuaPeserta}>
+                    <input type="hidden" name="ujian_id" value={ujianId} />
+                    <Tombol
+                      teks={`Setujui semua (${jumlahMenungguPersetujuan})`}
+                      jenis="kedua"
+                      teksProses="Menyetujui..."
+                      className={kelasTombolPapanKedua}
+                    />
+                  </form>
+                )}
               </>
             )}
           </PapanKode>
@@ -232,6 +244,19 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
             className="border-merah/30"
             tanpaPadding
           >
+            <form
+              action={bukaLangsungSemua}
+              className="flex flex-wrap items-center justify-between gap-3 border-b border-garis bg-merah-muda/40 px-5 py-3"
+            >
+              <span className="text-xs text-tinta-2">Satu kelas kena gangguan? Buka semua kunci sekaligus.</span>
+              <input type="hidden" name="ujian_id" value={ujianId} />
+              <TombolKonfirmasi
+                teks={`Buka semua (${listTerkunci.length})`}
+                jenis="bahaya"
+                ukuran="kecil"
+                pesanKonfirmasi={`Buka kunci ${listTerkunci.length} siswa sekaligus tanpa kode?`}
+              />
+            </form>
             <ul className="divide-y divide-garis">
               {listTerkunci.map((peserta) => {
                 const siswa = ambilSatu(peserta.siswa);

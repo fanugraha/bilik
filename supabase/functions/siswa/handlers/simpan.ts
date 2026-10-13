@@ -7,6 +7,7 @@ export async function simpan(db: SupabaseClient, body: Record<string, unknown>) 
   const token = String(body.token ?? "").trim();
   const soalId = String(body.soal_id ?? "");
   const isi = body.isi == null ? null : String(body.isi);
+  const alasan = body.alasan == null ? null : (String(body.alasan).trim() || null);
   const raguRagu = body.ragu_ragu === true;
   if (!soalId) return balas({ error: "Soal tidak valid" }, 400);
 
@@ -23,7 +24,7 @@ export async function simpan(db: SupabaseClient, body: Record<string, unknown>) 
   if (!relasi) return balas({ error: "Soal bukan bagian ujian ini" }, 400);
 
   const { error } = await db.from("jawaban").upsert(
-    { peserta_id: sesi.peserta.id, soal_id: soalId, isi, ragu_ragu: raguRagu, diterima_at: new Date().toISOString() },
+    { peserta_id: sesi.peserta.id, soal_id: soalId, isi, alasan, ragu_ragu: raguRagu, diterima_at: new Date().toISOString() },
     { onConflict: "peserta_id,soal_id" },
   );
   if (error) throw error;

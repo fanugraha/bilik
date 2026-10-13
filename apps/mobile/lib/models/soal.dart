@@ -32,13 +32,15 @@ class Soal {
 class JawabanTersimpan {
   final String soalId;
   final String? isi;
+  final String? alasan;
   final bool raguRagu;
 
-  const JawabanTersimpan({required this.soalId, this.isi, this.raguRagu = false});
+  const JawabanTersimpan({required this.soalId, this.isi, this.alasan, this.raguRagu = false});
 
   factory JawabanTersimpan.fromJson(Map<String, dynamic> json) => JawabanTersimpan(
         soalId: json['soal_id'] as String,
         isi: json['isi'] as String?,
+        alasan: json['alasan'] as String?,
         raguRagu: json['ragu_ragu'] as bool? ?? false,
       );
 }
