@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ambilSatu, type RelasiSatu } from "@/lib/relasi";
+import { hitungStatusPeserta, hitungTerjawabPerPeserta, ringkasanStatusUjian } from "@/lib/ruang-kontrol";
 import {
   setujuiPeserta,
   setujuiSemuaPeserta,
@@ -41,8 +42,6 @@ type PesertaItem = {
   selesai_at: string | null;
   siswa: RelasiSatu<{ nama: string; no_absen: number | null; kelas: RelasiSatu<{ nama: string }> }>;
 };
-
-type ItemRingkasan = { teks: string; jumlah: number; dari?: number; warna: string };
 
 // Tombol di atas papan gelap
 const kelasTombolPapanUtama = "bg-white! text-papan! hover:bg-nila-muda!";
@@ -90,38 +89,21 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
     ? await supabase.from("jawaban").select("peserta_id").in("peserta_id", listPesertaId).not("isi", "is", null)
     : { data: [] };
 
-  const jumlahTerjawabPerPeserta = new Map<string, number>();
-  for (const jawaban of listJawabanTerisi ?? []) {
-    jumlahTerjawabPerPeserta.set(jawaban.peserta_id, (jumlahTerjawabPerPeserta.get(jawaban.peserta_id) ?? 0) + 1);
-  }
-
-  let jumlahMenungguPersetujuan = 0;
-  let jumlahDisetujui = 0;
-  const jumlahPerStatus = new Map<string, number>();
-  for (const peserta of listPeserta) {
-    if (peserta.disetujui) jumlahDisetujui++;
-    else jumlahMenungguPersetujuan++;
-    jumlahPerStatus.set(peserta.status, (jumlahPerStatus.get(peserta.status) ?? 0) + 1);
-  }
+  const jumlahTerjawabPerPeserta = hitungTerjawabPerPeserta(listJawabanTerisi ?? []);
+  const ringkasan = hitungStatusPeserta(listPeserta);
+  const { jumlahMenungguPersetujuan, jumlahDisetujui } = ringkasan;
   const listTerkunci = listPeserta.filter((peserta) => peserta.status === "terkunci");
 
   const { error: errorQuery, sukses: pesanSukses, kode_buka: kodeBuka, nama: namaKodeBuka } = await searchParams;
   const aktif = ujian.status === "lobby" || ujian.status === "berjalan";
 
-  const ringkasanStatus: ItemRingkasan[] =
-    ujian.status === "lobby"
-      ? [
-          { teks: "Sudah masuk", jumlah: listPeserta.length, dari: jumlahSiswaTerdaftar ?? 0, warna: "text-tinta" },
-          { teks: "Menunggu persetujuan", jumlah: jumlahMenungguPersetujuan, warna: "text-biru" },
-          { teks: "Disetujui", jumlah: jumlahDisetujui, warna: "text-hijau" },
-          { teks: "Soal", jumlah: jumlahSoal ?? 0, warna: "text-tinta" },
-        ]
-      : [
-          { teks: "Mengerjakan", jumlah: jumlahPerStatus.get("mengerjakan") ?? 0, warna: "text-hijau" },
-          { teks: "Terkunci", jumlah: jumlahPerStatus.get("terkunci") ?? 0, warna: "text-merah" },
-          { teks: "Selesai", jumlah: jumlahPerStatus.get("selesai") ?? 0, warna: "text-tinta-2" },
-          { teks: "Belum disetujui", jumlah: jumlahMenungguPersetujuan, warna: "text-biru" },
-        ];
+  const ringkasanStatus = ringkasanStatusUjian({
+    statusUjian: ujian.status,
+    jumlahPeserta: listPeserta.length,
+    jumlahSiswaTerdaftar: jumlahSiswaTerdaftar ?? 0,
+    jumlahSoal: jumlahSoal ?? 0,
+    ringkasan,
+  });
 
   return (
     <>
