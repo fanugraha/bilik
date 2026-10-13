@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateUjian } from "@/actions/ujian";
+import { ambilDaftarMapel } from "@/lib/mapel";
 import { IsianUjian } from "@/components/ujian/isian-ujian";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
@@ -23,12 +24,14 @@ async function FormUbahUjian({ ujianId, searchParams }: { ujianId: string; searc
 
   const { data: ujian } = await supabase
     .from("ujian")
-    .select("id, judul, mapel, durasi, batas_pelanggaran, acak_soal, acak_opsi, status")
+    .select("id, judul, mapel_id, durasi, batas_pelanggaran, acak_soal, acak_opsi, status")
     .eq("id", ujianId)
     .eq("guru_id", user.id)
     .single();
 
   if (!ujian) redirect("/dashboard/ujian");
+
+  const daftarMapel = await ambilDaftarMapel(supabase);
 
   const { data: listKelas } = await supabase
     .from("kelas")
@@ -61,11 +64,12 @@ async function FormUbahUjian({ ujianId, searchParams }: { ujianId: string; searc
           <input type="hidden" name="id" value={ujian.id} />
           <IsianUjian
             listKelas={listKelas ?? []}
+            daftarMapel={daftarMapel}
             teksSimpan="Simpan perubahan"
             hrefBatal={`/dashboard/ujian/${ujianId}/soal`}
             nilaiAwal={{
               judul: ujian.judul,
-              mapel: ujian.mapel,
+              mapel_id: ujian.mapel_id,
               durasi: ujian.durasi,
               batas_pelanggaran: ujian.batas_pelanggaran,
               acak_soal: ujian.acak_soal,

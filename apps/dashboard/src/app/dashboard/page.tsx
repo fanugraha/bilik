@@ -9,16 +9,25 @@ import { Kartu } from "@/components/ui/card";
 import { Ikon } from "@/components/ui/ikon";
 import { LencanaStatusUjian } from "@/components/ui/lencana";
 import { TautanTombol } from "@/components/ui/tautan-tombol";
-import { KeadaanKosong } from "@/components/ui/keadaan-kosong";
+import { Pesan } from "@/components/ui/alert";
+import { namaMasihBawaan } from "@/lib/profil";
+import { susunLangkahMulai } from "@/lib/alur";
 
 export const metadata: Metadata = { title: "Beranda" };
 
-type LangkahMulai = { judul: string; deskripsi: string; href: string; selesai: boolean };
+type UjianRingkas = { id: string; judul: string; mapel: string | null; status: string; kode: string; durasi: number };
 
-function hrefUjian(ujian: { id: string; status: string }) {
+function hrefUjian(ujian: UjianRingkas) {
   if (ujian.status === "draft") return `/dashboard/ujian/${ujian.id}/soal`;
   if (ujian.status === "lobby" || ujian.status === "berjalan") return `/dashboard/ujian/${ujian.id}/lobby`;
   return `/dashboard/ujian/${ujian.id}/nilai`;
+}
+
+// Kata aksi mengikuti tujuan klik, supaya guru tahu baris itu membawa ke mana
+function labelAksiUjian(status: string) {
+  if (status === "draft") return "Susun soal";
+  if (status === "lobby" || status === "berjalan") return "Pantau";
+  return "Lihat nilai";
 }
 
 async function IsiBeranda() {
@@ -30,10 +39,10 @@ async function IsiBeranda() {
 
   if (!user) redirect("/login");
 
-  const [{ data: guru }, { count: jumlahKelas }, { count: jumlahSiswa }, { count: jumlahSoal }, { data: listUjian }] =
+  const [{ data: guru }, { data: listKelas }, { count: jumlahSiswa }, { count: jumlahSoal }, { data: listUjian }, { data: listBank }] =
     await Promise.all([
-      supabase.from("guru").select("nama").eq("id", user.id).single(),
-      supabase.from("kelas").select("id", { count: "exact", head: true }).eq("guru_id", user.id),
+      supabase.from("guru").select("nama, email").eq("id", user.id).single(),
+      supabase.from("kelas").select("id, siswa(count)").eq("guru_id", user.id).order("nama", { ascending: true }),
       // RLS membatasi ke siswa di kelas milik guru ini
       supabase.from("siswa").select("id", { count: "exact", head: true }),
       supabase.from("soal").select("id", { count: "exact", head: true }).eq("guru_id", user.id),
@@ -43,9 +52,16 @@ async function IsiBeranda() {
         .eq("guru_id", user.id)
         .order("created_at", { ascending: false })
         .limit(8),
+      supabase.from("bank_soal").select("id").eq("guru_id", user.id).order("created_at", { ascending: true }).limit(1),
     ]);
 
-  const listUjianAktif = (listUjian ?? []).filter((ujian) => ujian.status === "lobby" || ujian.status === "berjalan");
+  const daftarKelas = (listKelas ?? []) as { id: string; siswa: { count: number }[] }[];
+  const jumlahKelas = daftarKelas.length;
+
+  const semuaUjian = (listUjian ?? []) as UjianRingkas[];
+  const listUjianAktif = semuaUjian.filter((ujian) => ujian.status === "lobby" || ujian.status === "berjalan");
+  // Ujian aktif sudah tampil sebagai blok pantau di atas, jadi keluar dari daftar agar tidak dobel
+  const listUjianLain = semuaUjian.filter((ujian) => ujian.status !== "lobby" && ujian.status !== "berjalan");
 
   const jumlahPesertaPerUjian = new Map<string, number>();
   if (listUjianAktif.length > 0) {
@@ -61,66 +77,111 @@ async function IsiBeranda() {
     }
   }
 
-  const listLangkah: LangkahMulai[] = [
-    { judul: "Buat kelas", deskripsi: "Misalnya X IPA 1.", href: "/dashboard/kelas", selesai: (jumlahKelas ?? 0) > 0 },
-    { judul: "Masukkan siswa", deskripsi: "Tempel daftar nama dari Excel.", href: "/dashboard/kelas", selesai: (jumlahSiswa ?? 0) > 0 },
-    { judul: "Tulis soal", deskripsi: "PG, benar/salah, atau essay.", href: "/dashboard/soal/buat", selesai: (jumlahSoal ?? 0) > 0 },
-    { judul: "Susun ujian", deskripsi: "Pilih soal dan kelas peserta.", href: "/dashboard/ujian/buat", selesai: (listUjian ?? []).length > 0 },
-  ];
+  const listLangkah = susunLangkahMulai({
+    jumlahKelas,
+    kelasTanpaSiswaId: daftarKelas.find((kelas) => (kelas.siswa[0]?.count ?? 0) === 0)?.id ?? null,
+    adaSiswa: (jumlahSiswa ?? 0) > 0,
+    bankPertamaId: listBank?.[0]?.id ?? null,
+    adaSoal: (jumlahSoal ?? 0) > 0,
+    adaUjian: semuaUjian.length > 0,
+  });
   const semuaLangkahSelesai = listLangkah.every((langkah) => langkah.selesai);
+  // Saat data masih awal, aksi utama mengikuti langkah terdekat, bukan langsung "Buat ujian"
+  const langkahBerikutnya = listLangkah.find((langkah) => langkah.berikutnya) ?? null;
 
   const ringkasan = [
-    { teks: "Kelas", jumlah: jumlahKelas ?? 0, href: "/dashboard/kelas" },
+    { teks: "Kelas", jumlah: jumlahKelas, href: "/dashboard/kelas" },
     { teks: "Siswa", jumlah: jumlahSiswa ?? 0, href: "/dashboard/kelas" },
-    { teks: "Soal di bank soal", jumlah: jumlahSoal ?? 0, href: "/dashboard/soal" },
+    { teks: "Soal", jumlah: jumlahSoal ?? 0, href: "/dashboard/soal" },
   ];
+
+  // Aksi utama header mengikuti keadaan: pantau dulu bila ada ujian hidup,
+  // lalu langkah terdekat saat data masih awal, baru "Buat ujian" bila sudah cukup
+  const ujianPrioritas = listUjianAktif[0] ?? null;
+  const aksiUtama = ujianPrioritas
+    ? { href: `/dashboard/ujian/${ujianPrioritas.id}/lobby`, teks: "Pantau ujian", ikon: "layar-penuh" as const }
+    : langkahBerikutnya
+      ? { href: langkahBerikutnya.href, teks: langkahBerikutnya.judul, ikon: "tambah" as const }
+      : { href: "/dashboard/ujian/buat", teks: "Buat ujian", ikon: "tambah" as const };
 
   return (
     <>
       <KepalaHalaman
         judul={`Halo, ${guru?.nama ?? "Guru"}`}
         deskripsi="Ringkasan kelas dan ujian Anda."
-        aksi={<TautanTombol href="/dashboard/ujian/buat" teks="Buat ujian" jenis="utama" ikon="tambah" />}
+        aksi={<TautanTombol href={aksiUtama.href} teks={aksiUtama.teks} jenis="utama" ikon={aksiUtama.ikon} />}
       />
 
       <div className="space-y-6">
-        {listUjianAktif.map((ujian) => (
-          <section
-            key={ujian.id}
-            className="flex flex-col gap-5 rounded-xl bg-papan p-6 text-white sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="min-w-0">
-              <p className="flex items-center gap-2 text-sm text-white/70">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />
-                {ujian.status === "lobby" ? "Lobby dibuka, siswa sedang bergabung" : "Ujian sedang berjalan"}
-              </p>
-              <h2 className="mt-1 truncate text-xl font-bold">{ujian.judul}</h2>
-              <p className="mt-1 text-sm text-white/70">{jumlahPesertaPerUjian.get(ujian.id) ?? 0} siswa di ruang ujian</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-5">
-              <div>
-                <p className="text-xs text-white/60">Kode ujian</p>
-                <p className="angka text-3xl font-extrabold tracking-[0.15em]">{ujian.kode}</p>
-              </div>
-              <Link
-                href={`/dashboard/ujian/${ujian.id}/lobby`}
-                className="inline-flex h-11 items-center rounded-lg bg-white px-5 text-sm font-semibold text-papan hover:bg-nila-muda"
+        {listUjianAktif.length > 0 && (
+          <div className="space-y-3">
+            {listUjianAktif.map((ujian) => (
+              <section
+                key={ujian.id}
+                className="flex flex-col gap-4 rounded-xl border border-garis bg-permukaan p-5 sm:flex-row sm:items-center sm:justify-between"
               >
-                Buka ruang kontrol
-              </Link>
-            </div>
-          </section>
-        ))}
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-hijau" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-hijau">
+                      {ujian.status === "lobby" ? "Lobby dibuka, siswa sedang bergabung" : "Ujian sedang berjalan"}
+                    </p>
+                    <h2 className="mt-0.5 truncate text-lg font-bold text-tinta">{ujian.judul}</h2>
+                    <p className="mt-0.5 text-sm text-tinta-2">
+                      {jumlahPesertaPerUjian.get(ujian.id) ?? 0} siswa di ruang ujian
+                      {ujian.mapel ? `, ${ujian.mapel}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-5">
+                  <div>
+                    <p className="text-xs text-tinta-2">Kode ujian</p>
+                    <p className="angka text-2xl font-extrabold tracking-[0.15em] text-papan">{ujian.kode}</p>
+                  </div>
+                  <TautanTombol href={`/dashboard/ujian/${ujian.id}/lobby`} teks="Buka ruang kontrol" jenis="utama" />
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {namaMasihBawaan(guru?.nama, guru?.email ?? user.email) && (
+          <Pesan jenis="info">
+            Profil Anda belum lengkap.{" "}
+            <Link href="/dashboard/profil" className="underline underline-offset-2">
+              Isi nama lengkap
+            </Link>{" "}
+            agar tampil dengan benar di dashboard dan nilai ujian.
+          </Pesan>
+        )}
+
+        <Kartu tanpaPadding>
+          <ul className="grid grid-cols-3 divide-x divide-garis">
+            {ringkasan.map((item) => (
+              <li key={item.teks}>
+                <Link href={item.href} className="flex flex-col gap-0.5 px-5 py-4 hover:bg-kertas">
+                  <span className="text-xs font-medium text-tinta-2">{item.teks}</span>
+                  <span className="angka text-2xl font-bold text-tinta">{item.jumlah}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Kartu>
 
         {!semuaLangkahSelesai && (
-          <Kartu judul="Mulai dari sini" deskripsi="Empat langkah sebelum ujian pertama Anda.">
-            <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Kartu judul="Mulai dari sini" deskripsi="Lima langkah sebelum ujian pertama Anda. Klik langkah yang ditandai.">
+            <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {listLangkah.map((langkah, indeks) => (
                 <li key={langkah.judul}>
                   <Link
                     href={langkah.href}
+                    aria-current={langkah.berikutnya ? "step" : undefined}
                     className={`flex h-full gap-3 rounded-lg border p-4 transition-colors ${
-                      langkah.selesai ? "border-garis bg-kertas" : "border-garis hover:border-nila hover:bg-nila-muda"
+                      langkah.selesai
+                        ? "border-garis bg-kertas"
+                        : langkah.berikutnya
+                          ? "border-nila bg-nila-muda ring-1 ring-nila"
+                          : "border-garis hover:border-nila hover:bg-nila-muda"
                     }`}
                   >
                     <span
@@ -135,6 +196,7 @@ async function IsiBeranda() {
                         {langkah.judul}
                       </span>
                       <span className="mt-0.5 block text-xs text-tinta-2">{langkah.deskripsi}</span>
+                      {langkah.berikutnya && <span className="mt-2 block text-xs font-semibold text-nila">Langkah berikutnya →</span>}
                     </span>
                   </Link>
                 </li>
@@ -143,52 +205,36 @@ async function IsiBeranda() {
           </Kartu>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        {listUjianLain.length > 0 && (
           <Kartu
             judul="Ujian terbaru"
             aksi={<TautanTombol href="/dashboard/ujian" teks="Lihat semua" jenis="hantu" ukuran="kecil" />}
             tanpaPadding
           >
-            {(listUjian ?? []).length === 0 ? (
-              <KeadaanKosong
-                ikon="ujian"
-                judul="Belum ada ujian"
-                deskripsi="Susun ujian dari soal di bank soal, lalu buka lobby saat kelas siap."
-                aksi={<TautanTombol href="/dashboard/ujian/buat" teks="Buat ujian" jenis="utama" ikon="tambah" />}
-              />
-            ) : (
-              <ul className="divide-y divide-garis">
-                {(listUjian ?? []).map((ujian) => (
-                  <li key={ujian.id}>
-                    <Link href={hrefUjian(ujian)} className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-kertas">
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-tinta">{ujian.judul}</span>
-                        <span className="block text-xs text-tinta-2">
-                          {ujian.mapel ? `${ujian.mapel}, ` : ""}
-                          {ujian.durasi} menit
-                        </span>
-                      </span>
-                      <LencanaStatusUjian status={ujian.status} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Kartu>
-
-          <Kartu judul="Ringkasan" tanpaPadding>
             <ul className="divide-y divide-garis">
-              {ringkasan.map((item) => (
-                <li key={item.teks}>
-                  <Link href={item.href} className="flex items-center justify-between px-5 py-3.5 hover:bg-kertas">
-                    <span className="text-sm text-tinta-2">{item.teks}</span>
-                    <span className="angka text-lg font-bold text-tinta">{item.jumlah}</span>
+              {listUjianLain.map((ujian) => (
+                <li key={ujian.id}>
+                  <Link href={hrefUjian(ujian)} className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-kertas">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-tinta">{ujian.judul}</span>
+                      <span className="block text-xs text-tinta-2">
+                        {ujian.mapel ? `${ujian.mapel}, ` : ""}
+                        {ujian.durasi} menit
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-3">
+                      <LencanaStatusUjian status={ujian.status} />
+                      <span className="hidden items-center gap-0.5 text-xs font-semibold text-nila sm:inline-flex">
+                        {labelAksiUjian(ujian.status)}
+                        <Ikon nama="lanjut" className="h-3.5 w-3.5" />
+                      </span>
+                    </span>
                   </Link>
                 </li>
               ))}
             </ul>
           </Kartu>
-        </div>
+        )}
       </div>
     </>
   );

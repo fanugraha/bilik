@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { bacaDataImpor } from "@/lib/impor-siswa";
+import { rapikanNamaOrang } from "@/lib/nama";
 
 // Kode 23505 = melanggar unique (kelas_id, no_absen)
 function pesanErrorSiswa(error: { code?: string; message: string }) {
@@ -20,7 +21,7 @@ export async function createSiswa(formData: FormData) {
   if (!user) redirect("/login");
 
   const kelasId = formData.get("kelas_id") as string;
-  const nama = formData.get("nama") as string;
+  const nama = rapikanNamaOrang((formData.get("nama") as string) ?? "");
   const noAbsen = parseInt(formData.get("no_absen") as string);
 
   const { error } = await supabase.from("siswa").insert({
@@ -47,7 +48,7 @@ export async function updateSiswa(formData: FormData) {
 
   const id = formData.get("id") as string;
   const kelasId = formData.get("kelas_id") as string;
-  const nama = formData.get("nama") as string;
+  const nama = rapikanNamaOrang((formData.get("nama") as string) ?? "");
   const noAbsen = parseInt(formData.get("no_absen") as string);
 
   const { error } = await supabase

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { login } from "@/actions/auth";
+import { login, loginDenganGoogle } from "@/actions/auth";
 import { CangkangAuth } from "@/components/auth/cangkang-auth";
 import { Pesan } from "@/components/ui/alert";
 import { Tombol } from "@/components/ui/button";
@@ -44,6 +44,14 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ er
       <Suspense fallback={null}>
         <FormLogin searchParams={searchParams} />
       </Suspense>
+      <div className="mt-6 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-tinta-3">
+        <span className="h-px flex-1 bg-garis" />
+        atau
+        <span className="h-px flex-1 bg-garis" />
+      </div>
+      <form className="mt-6">
+        <Tombol teks="Masuk dengan Google" jenis="kedua" ikon="google" formAction={loginDenganGoogle} className="w-full" />
+      </form>
     </CangkangAuth>
   );
 }

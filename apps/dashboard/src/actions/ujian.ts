@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { mapelDariForm } from "@/lib/mapel";
 
 // Hanya kelas milik guru yang boleh jadi peserta ujian
 async function saringKelasMilikGuru(
@@ -24,7 +25,7 @@ export async function createUjian(formData: FormData) {
   if (!user) redirect("/login");
 
   const judul = (formData.get("judul") as string)?.trim();
-  const mapel = (formData.get("mapel") as string)?.trim() || null;
+  const { mapel_id } = await mapelDariForm(supabase, formData);
   const durasi = parseInt(formData.get("durasi") as string);
   const acakSoal = formData.get("acak_soal") === "true";
   const acakOpsi = formData.get("acak_opsi") === "true";
@@ -38,7 +39,7 @@ export async function createUjian(formData: FormData) {
     .insert({
       guru_id: user.id,
       judul,
-      mapel,
+      mapel_id,
       durasi,
       acak_soal: acakSoal,
       acak_opsi: acakOpsi,
@@ -56,8 +57,11 @@ export async function createUjian(formData: FormData) {
     await supabase.from("ujian_kelas").insert(kelasData);
   }
 
+  // Dibuat dari halaman bank: pemilih soal langsung menampilkan bank itu
+  const bankAsal = ((formData.get("bank") as string) ?? "").replace(/[^0-9a-f-]/gi, "");
+
   revalidatePath("/dashboard/ujian");
-  redirect(`/dashboard/ujian/${ujian.id}/soal`);
+  redirect(`/dashboard/ujian/${ujian.id}/soal${bankAsal ? `?bank=${bankAsal}` : ""}`);
 }
 
 export async function updateUjian(formData: FormData) {
@@ -70,7 +74,7 @@ export async function updateUjian(formData: FormData) {
 
   const id = formData.get("id") as string;
   const judul = (formData.get("judul") as string)?.trim();
-  const mapel = (formData.get("mapel") as string)?.trim() || null;
+  const { mapel_id } = await mapelDariForm(supabase, formData);
   const durasi = parseInt(formData.get("durasi") as string);
   const acakSoal = formData.get("acak_soal") === "true";
   const acakOpsi = formData.get("acak_opsi") === "true";
@@ -85,7 +89,7 @@ export async function updateUjian(formData: FormData) {
     .from("ujian")
     .update({
       judul,
-      mapel,
+      mapel_id,
       durasi,
       acak_soal: acakSoal,
       acak_opsi: acakOpsi,

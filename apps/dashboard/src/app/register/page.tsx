@@ -6,6 +6,7 @@ import { CangkangAuth } from "@/components/auth/cangkang-auth";
 import { Pesan } from "@/components/ui/alert";
 import { Tombol } from "@/components/ui/button";
 import { KotakInput } from "@/components/ui/input";
+import { ATURAN_KATA_SANDI, PANJANG_KATA_SANDI_MIN } from "@/lib/profil";
 
 export const metadata: Metadata = { title: "Daftar" };
 
@@ -17,8 +18,8 @@ async function FormDaftar({ searchParams }: { searchParams: Promise<{ error?: st
       {error && <Pesan jenis="error">{error}</Pesan>}
       <KotakInput nama="nama" label="Nama" wajib placeholder="Contoh: Rina Kusuma, S.Pd." autoComplete="name" bantuan="Nama ini tampil di dashboard." />
       <KotakInput nama="email" label="Email" tipe="email" wajib placeholder="guru@sekolah.sch.id" autoComplete="email" />
-      <KotakInput nama="password" label="Kata sandi" tipe="password" wajib minPanjang={6} autoComplete="new-password" bantuan="Minimal 6 karakter." />
-      <KotakInput nama="konfirmasi_password" label="Ulangi kata sandi" tipe="password" wajib minPanjang={6} autoComplete="new-password" />
+      <KotakInput nama="password" label="Kata sandi" tipe="password" wajib minPanjang={PANJANG_KATA_SANDI_MIN} autoComplete="new-password" bantuan={ATURAN_KATA_SANDI} />
+      <KotakInput nama="konfirmasi_password" label="Ulangi kata sandi" tipe="password" wajib minPanjang={PANJANG_KATA_SANDI_MIN} autoComplete="new-password" />
       <Tombol teks="Buat akun" teksProses="Membuat akun..." formAction={signup} className="w-full" />
     </form>
   );

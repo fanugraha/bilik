@@ -8,6 +8,7 @@ import { CangkangAuth } from "@/components/auth/cangkang-auth";
 import { Pesan } from "@/components/ui/alert";
 import { Tombol } from "@/components/ui/button";
 import { KotakInput } from "@/components/ui/input";
+import { ATURAN_KATA_SANDI, PANJANG_KATA_SANDI_MIN } from "@/lib/profil";
 
 export const metadata: Metadata = { title: "Kata sandi baru" };
 
@@ -26,8 +27,8 @@ async function FormAturUlang({ searchParams }: { searchParams: Promise<{ error?:
   return (
     <form className="flex flex-col gap-5">
       {error && <Pesan jenis="error">{error}</Pesan>}
-      <KotakInput nama="password" label="Kata sandi baru" tipe="password" wajib minPanjang={6} autoComplete="new-password" bantuan="Minimal 6 karakter." />
-      <KotakInput nama="konfirmasi_password" label="Ulangi kata sandi baru" tipe="password" wajib minPanjang={6} autoComplete="new-password" />
+      <KotakInput nama="password" label="Kata sandi baru" tipe="password" wajib minPanjang={PANJANG_KATA_SANDI_MIN} autoComplete="new-password" bantuan={ATURAN_KATA_SANDI} />
+      <KotakInput nama="konfirmasi_password" label="Ulangi kata sandi baru" tipe="password" wajib minPanjang={PANJANG_KATA_SANDI_MIN} autoComplete="new-password" />
       <Tombol teks="Simpan kata sandi" teksProses="Menyimpan..." formAction={aturUlangPassword} className="w-full" />
     </form>
   );

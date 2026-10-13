@@ -51,6 +51,11 @@ async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searc
   const namaBank = new Map(bankList.map((b) => [b.id, b.nama]));
   const bankTerpilih = bankList.some((b) => b.id === bank) ? bank : "";
   const soalTampil = bankTerpilih ? soalTersedia.filter((soal) => soal.bank_soal_id === bankTerpilih) : soalTersedia;
+  // Menulis soal dari sini kembali ke halaman ini, tidak tersesat di Bank soal
+  const hrefTulisSoal = `/dashboard/soal/buat?${new URLSearchParams({
+    ...(bankTerpilih ? { bank: bankTerpilih } : {}),
+    kembali: `/dashboard/ujian/${ujianId}/soal${bankTerpilih ? `?bank=${bankTerpilih}` : ""}`,
+  }).toString()}`;
 
   let totalBobot = 0;
   for (const baris of soalUjian ?? []) totalBobot += Number(baris.bobot);
@@ -163,8 +168,8 @@ async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searc
             <KeadaanKosong
               ikon="soal"
               judul={(semuaSoal ?? []).length === 0 ? "Bank soal kosong" : "Semua soal sudah dipakai"}
-              deskripsi="Tulis soal baru di bank soal, lalu kembali ke sini."
-              aksi={<TautanTombol href="/dashboard/soal/buat" teks="Tulis soal" ikon="tambah" />}
+              deskripsi="Tulis soal baru. Setelah disimpan, Anda kembali ke halaman ini."
+              aksi={<TautanTombol href={hrefTulisSoal} teks="Tulis soal" jenis="utama" ikon="tambah" />}
             />
           ) : soalTampil.length === 0 ? (
             <KeadaanKosong
@@ -213,6 +218,12 @@ async function AturSoalUjian({ ujianId, searchParams }: { ujianId: string; searc
                   />
                 </form>
               )}
+
+              <div className="border-t border-garis px-5 py-3 text-center">
+                <Link href={hrefTulisSoal} className="text-sm font-semibold text-nila hover:underline">
+                  + Tulis soal baru untuk ujian ini
+                </Link>
+              </div>
             </>
           )}
         </Kartu>

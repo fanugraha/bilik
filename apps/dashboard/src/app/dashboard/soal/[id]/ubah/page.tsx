@@ -45,8 +45,15 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
     bank_soal_id: soal.bank_soal_id,
   };
 
+  const bankSoal = (daftarBank ?? []).find((bank) => bank.id === soal.bank_soal_id);
+
   return (
     <>
+      <KepalaHalaman
+        judul="Ubah soal"
+        deskripsi="Perubahan berlaku di semua ujian yang memakai soal ini."
+        kembali={bankSoal ? { href: `/dashboard/soal/bank/${bankSoal.id}`, teks: bankSoal.nama } : { href: "/dashboard/soal", teks: "Bank soal" }}
+      />
       {error && (
         <div className="mb-4">
           <Pesan jenis="error">{error}</Pesan>
@@ -62,11 +69,6 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
 export default function UbahSoalPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   return (
     <div className="max-w-3xl">
-      <KepalaHalaman
-        judul="Ubah soal"
-        deskripsi="Perubahan berlaku di semua ujian yang memakai soal ini."
-        kembali={{ href: "/dashboard/soal", teks: "Bank soal" }}
-      />
       <Suspense fallback={<p className="text-sm text-tinta-2">Memuat soal...</p>}>
         <FormUbahSoal params={params} searchParams={searchParams} />
       </Suspense>

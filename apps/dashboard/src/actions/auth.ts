@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { cekKataSandiBaru } from "@/lib/profil";
+import { rapikanNamaOrang } from "@/lib/nama";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -20,21 +22,37 @@ export async function login(formData: FormData) {
   redirect("/dashboard");
 }
 
+// Login/daftar lewat Google. Akun guru dibuat otomatis oleh trigger database saat pertama masuk.
+export async function loginDenganGoogle() {
+  const supabase = await createClient();
+  const alamatSitus = ambilAlamatSitus();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${alamatSitus}/auth/callback` },
+  });
+
+  if (error) {
+    redirect("/login?error=" + encodeURIComponent(error.message));
+  }
+
+  redirect(data.url);
+}
+
 export async function signup(formData: FormData) {
   const supabase = await createClient();
 
   const password = formData.get("password") as string;
   const konfirmasiPassword = formData.get("konfirmasi_password") as string;
 
-  if (password !== konfirmasiPassword) {
-    redirect("/register?error=" + encodeURIComponent("Konfirmasi kata sandi tidak cocok"));
-  }
+  const errorKataSandi = cekKataSandiBaru(password, konfirmasiPassword);
+  if (errorKataSandi) redirect("/register?error=" + encodeURIComponent(errorKataSandi));
 
   // Profil di tabel 'guru' dibuat trigger database dari metadata ini (PRD 7)
   const { error } = await supabase.auth.signUp({
     email: formData.get("email") as string,
     password,
-    options: { data: { nama: (formData.get("nama") as string)?.trim() || null } },
+    options: { data: { nama: rapikanNamaOrang((formData.get("nama") as string) ?? "") || null } },
   });
 
   if (error) {
@@ -49,8 +67,6 @@ export async function logout() {
   await supabase.auth.signOut();
   redirect("/login");
 }
-
-const PANJANG_KATA_SANDI_MIN = 6;
 
 // Alamat situs untuk link di email. Sengaja TIDAK diambil dari header Host/X-Forwarded-Host:
 // header bisa dipalsukan sehingga link reset di email guru mengarah ke situs penyerang.
@@ -96,12 +112,8 @@ export async function aturUlangPassword(formData: FormData) {
   const password = formData.get("password") as string;
   const konfirmasiPassword = formData.get("konfirmasi_password") as string;
 
-  if (!password || password.length < PANJANG_KATA_SANDI_MIN) {
-    redirect("/atur-ulang-password?error=" + encodeURIComponent(`Kata sandi minimal ${PANJANG_KATA_SANDI_MIN} karakter`));
-  }
-  if (password !== konfirmasiPassword) {
-    redirect("/atur-ulang-password?error=" + encodeURIComponent("Konfirmasi kata sandi tidak cocok"));
-  }
+  const errorKataSandi = cekKataSandiBaru(password, konfirmasiPassword);
+  if (errorKataSandi) redirect("/atur-ulang-password?error=" + encodeURIComponent(errorKataSandi));
 
   const { error } = await supabase.auth.updateUser({ password });
 

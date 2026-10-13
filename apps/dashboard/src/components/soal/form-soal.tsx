@@ -25,7 +25,12 @@ type FormSoalProps = {
   teksSimpan: string;
   idSoal?: string;
   nilaiAwal?: NilaiAwalSoal;
-  daftarBank?: BankRingkas[];
+  daftarBank: BankRingkas[];
+  bankTerpilih?: string;
+  // Halaman tujuan setelah simpan/batal, mis. pemilih soal ujian. Kosong = kembali ke bank.
+  kembali?: string | null;
+  // Soal baru: tampilkan "Simpan & tulis lagi" agar guru bisa menulis banyak soal berturut-turut
+  bolehTulisLagi?: boolean;
 };
 
 const pilihanTipe: { nilai: TipeSoal; teks: string; keterangan: string }[] = [
@@ -37,12 +42,15 @@ const pilihanTipe: { nilai: TipeSoal; teks: string; keterangan: string }[] = [
 const hurufOpsi = ["A", "B", "C", "D", "E"];
 
 // Form soal untuk halaman Buat dan Ubah. Hanya isian yang relevan dengan tipe soal yang tampil.
-export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank = [] }: FormSoalProps) {
+export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank, bankTerpilih, kembali, bolehTulisLagi = false }: FormSoalProps) {
   const [tipe, setTipe] = useState<TipeSoal>(nilaiAwal?.tipe ?? "pg");
+  const bankAwal = nilaiAwal?.bank_soal_id ?? bankTerpilih ?? daftarBank[0]?.id ?? "";
+  const hrefBatal = kembali ?? (bankAwal ? `/dashboard/soal/bank/${bankAwal}` : "/dashboard/soal");
 
   return (
     <form action={aksi} className="space-y-6">
       {idSoal && <input type="hidden" name="id" value={idSoal} />}
+      {kembali && <input type="hidden" name="kembali" value={kembali} />}
 
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-tinta">Tipe soal</legend>
@@ -71,19 +79,15 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank = [] 
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="bank_soal_id" className="text-sm font-medium text-tinta">
-          Bank soal <span className="font-normal text-tinta-2">(opsional, untuk mengelompokkan)</span>
+          Simpan ke bank
         </label>
-        <select id="bank_soal_id" name="bank_soal_id" defaultValue={nilaiAwal?.bank_soal_id ?? ""} className="bidang">
-          <option value="">Tanpa bank</option>
+        <select id="bank_soal_id" name="bank_soal_id" required defaultValue={bankAwal} className="bidang">
           {daftarBank.map((bank) => (
             <option key={bank.id} value={bank.id}>
               {bank.nama}
             </option>
           ))}
         </select>
-        {daftarBank.length === 0 && (
-          <p className="text-xs text-tinta-2">Belum ada bank soal. Buat bank di halaman Bank soal bila ingin mengelompokkan.</p>
-        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
@@ -203,9 +207,11 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank = [] 
         </div>
       )}
 
-      <div className="flex justify-end gap-2 border-t border-garis pt-5">
-        <TautanTombol href="/dashboard/soal" teks="Batal" jenis="hantu" />
+      {/* Tombol utama pertama di DOM agar Enter menyimpan biasa; tampilan dibalik supaya tetap di kanan */}
+      <div className="flex flex-row-reverse flex-wrap justify-start gap-2 border-t border-garis pt-5">
         <Tombol teks={teksSimpan} teksProses="Menyimpan..." />
+        {bolehTulisLagi && <Tombol teks="Simpan & tulis lagi" jenis="kedua" nama="lanjut" nilai="lagi" teksProses="Menyimpan..." />}
+        <TautanTombol href={hrefBatal} teks="Batal" jenis="hantu" />
       </div>
     </form>
   );

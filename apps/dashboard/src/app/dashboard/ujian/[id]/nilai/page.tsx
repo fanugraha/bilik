@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ambilRekapNilai, rataRataNilai, rekapPerSoal, sebaranNilai, type BarisRekap } from "@/lib/nilai";
+import { ambilRekapNilai, rataRataNilai, rekapPerSoal, sebaranNilai } from "@/lib/nilai";
 import { hitungNilaiOtomatis, tandaiDinilai } from "@/actions/nilai";
 import { Tombol } from "@/components/ui/button";
 import { Kartu } from "@/components/ui/card";

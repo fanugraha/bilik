@@ -56,12 +56,22 @@ export function NavigasiSamping({ namaGuru }: { namaGuru: string }) {
       </nav>
 
       <div className="border-t border-garis px-3 py-4">
-        <div className="mb-2 flex items-center gap-3 px-3">
+        <Link
+          href="/dashboard/profil"
+          aria-current={menuAktif(pathname, "/dashboard/profil") ? "page" : undefined}
+          onClick={() => setMenuTerbuka(false)}
+          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2 transition-colors ${
+            menuAktif(pathname, "/dashboard/profil") ? "bg-nila-muda" : "hover:bg-kertas"
+          }`}
+        >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-kertas text-sm font-bold text-tinta-2">
             {namaGuru ? namaGuru.charAt(0).toUpperCase() : "?"}
           </span>
-          <span className="min-w-0 truncate text-sm font-semibold text-tinta">{namaGuru || "Guru"}</span>
-        </div>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-tinta">{namaGuru || "Guru"}</span>
+            <span className="block text-xs text-tinta-2">Profil</span>
+          </span>
+        </Link>
         <form action={logout}>
           <button
             type="submit"

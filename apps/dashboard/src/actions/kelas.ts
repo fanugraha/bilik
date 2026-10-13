@@ -13,17 +13,23 @@ export async function createKelas(formData: FormData) {
   if (!user) redirect("/login");
 
   const nama = formData.get("nama") as string;
-  const { error } = await supabase.from("kelas").insert({
-    guru_id: user.id,
-    nama,
-  });
+  const { data: kelas, error } = await supabase
+    .from("kelas")
+    .insert({
+      guru_id: user.id,
+      nama,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    redirect("/dashboard/kelas?error=" + encodeURIComponent(error.message));
+  if (error || !kelas) {
+    const pesan = error?.code === "23505" ? "Nama kelas itu sudah ada. Pakai nama lain." : (error?.message ?? "Kelas gagal dibuat");
+    redirect("/dashboard/kelas?error=" + encodeURIComponent(pesan));
   }
 
+  // Langkah berikutnya setelah membuat kelas adalah mengisi siswanya
   revalidatePath("/dashboard/kelas");
-  redirect("/dashboard/kelas");
+  redirect(`/dashboard/kelas/${kelas.id}/siswa?sukses=` + encodeURIComponent(`Kelas ${nama} dibuat. Sekarang masukkan siswanya.`));
 }
 
 export async function updateKelas(formData: FormData) {
@@ -44,7 +50,8 @@ export async function updateKelas(formData: FormData) {
     .eq("guru_id", user.id);
 
   if (error) {
-    redirect("/dashboard/kelas?error=" + encodeURIComponent(error.message));
+    const pesan = error.code === "23505" ? "Nama kelas itu sudah ada. Pakai nama lain." : error.message;
+    redirect("/dashboard/kelas?error=" + encodeURIComponent(pesan));
   }
 
   revalidatePath("/dashboard/kelas");

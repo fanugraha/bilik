@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Tombol } from "@/components/ui/button";
 import { TautanTombol } from "@/components/ui/tautan-tombol";
+import { PilihMapel } from "@/components/ui/pilih-mapel";
+import type { MapelRingkas } from "@/lib/mapel";
 
 type Kelas = { id: string; nama: string };
 
 export type NilaiAwalUjian = {
   judul: string;
-  mapel: string | null;
+  mapel_id: string | null;
   durasi: number;
   batas_pelanggaran: number;
   acak_soal: boolean;
@@ -16,9 +18,12 @@ export type NilaiAwalUjian = {
 
 type IsianUjianProps = {
   listKelas: Kelas[];
+  daftarMapel: MapelRingkas[];
   teksSimpan: string;
   hrefBatal: string;
   nilaiAwal?: NilaiAwalUjian;
+  // Mapel bawaan untuk ujian baru, mis. dari bank soal asal
+  mapelIdAwal?: string | null;
 };
 
 function JudulBagian({ judul, deskripsi }: { judul: string; deskripsi?: string }) {
@@ -31,7 +36,7 @@ function JudulBagian({ judul, deskripsi }: { judul: string; deskripsi?: string }
 }
 
 // Isian form ujian, dipakai halaman Buat dan Ubah Ujian
-export function IsianUjian({ listKelas, teksSimpan, hrefBatal, nilaiAwal }: IsianUjianProps) {
+export function IsianUjian({ listKelas, daftarMapel, teksSimpan, hrefBatal, nilaiAwal, mapelIdAwal }: IsianUjianProps) {
   return (
     <div className="divide-y divide-garis">
       <section className="pb-6">
@@ -43,12 +48,7 @@ export function IsianUjian({ listKelas, teksSimpan, hrefBatal, nilaiAwal }: Isia
             </label>
             <input id="judul" type="text" name="judul" required defaultValue={nilaiAwal?.judul} placeholder="Contoh: PTS Matematika Semester 1" className="bidang" />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="mapel" className="text-sm font-medium text-tinta">
-              Mapel <span className="font-normal text-tinta-2">(opsional)</span>
-            </label>
-            <input id="mapel" type="text" name="mapel" defaultValue={nilaiAwal?.mapel ?? ""} placeholder="Matematika" className="bidang" />
-          </div>
+          <PilihMapel daftar={daftarMapel} terpilih={nilaiAwal?.mapel_id ?? mapelIdAwal} label="Mapel (opsional)" />
         </div>
       </section>
 
