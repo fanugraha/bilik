@@ -56,8 +56,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   void initState() {
     super.initState();
     _netSub = Connectivity().onConnectivityChanged.listen((hasil) {
-      if (mounted)
+      if (mounted) {
         setState(() => _offline = hasil.contains(ConnectivityResult.none));
+      }
     });
     _muat();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => _detik());
@@ -98,8 +99,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       if (hasil.acakSoal) list.shuffle(acak);
       for (final s in list) {
         final indeks = List<int>.generate(s.opsi.length, (i) => i);
-        if (hasil.acakOpsi)
+        if (hasil.acakOpsi) {
           indeks.shuffle(Random(token.hashCode ^ s.id.hashCode));
+        }
         _urutanOpsi[s.id] = indeks;
         if (s.isEssay) _ctrl[s.id] = TextEditingController();
       }
@@ -136,9 +138,12 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   void _detik() {
     if (_deadline != null) {
       final sisa = _deadline!.difference(DateTime.now());
-      if (mounted)
+      if (mounted) {
         setState(() => _sisa = sisa.isNegative ? Duration.zero : sisa);
-      if (sisa.isNegative && !_selesai && !_mengirim) _kumpulkan(paksa: true);
+      }
+      if (sisa.isNegative && !_selesai && !_mengirim) {
+        _kumpulkan(paksa: true);
+      }
     }
     if (_menyimpan &&
         ref.read(autosaveServiceProvider).pendingCount == 0 &&
@@ -299,8 +304,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_memuat)
+    if (_memuat) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     if (_error != null) {
       return Scaffold(
         body: Center(
@@ -338,22 +344,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: Text('Soal ${_index + 1} dari ${_soal.length}'),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(child: _pilTimer()),
-            ),
-          ],
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1),
-          ),
-        ),
+        backgroundColor: BilikWarna.kertas,
         body: Column(
           children: [
+            _kepala(),
             _bilahStatus(),
             Expanded(
               child: ListView(
@@ -372,10 +366,57 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     );
   }
 
+  // Header gradien: nomor soal, timer, dan bilah kemajuan.
+  Widget _kepala() {
+    final terjawab = _soal.where((s) => (_isi[s.id] ?? '').isNotEmpty).length;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(colors: [BilikWarna.papan, BilikWarna.nila], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.description_outlined, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Soal ${_index + 1} dari ${_soal.length}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    _pilTimer(),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: _soal.isEmpty ? 0 : terjawab / _soal.length,
+                    minHeight: 6,
+                    backgroundColor: Colors.white.withValues(alpha: 0.24),
+                    valueColor: const AlwaysStoppedAnimation(Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('$terjawab dari ${_soal.length} soal terjawab', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11.5)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _pilTimer() {
     final rendah = _sisa.inSeconds <= 60;
-    final warna = rendah ? BilikWarna.merah : BilikWarna.nila;
-    final latar = rendah ? BilikWarna.merahMuda : BilikWarna.nilaMuda;
+    final warna = rendah ? BilikWarna.merah : Colors.white;
+    final latar = rendah ? Colors.white : Colors.white.withValues(alpha: 0.18);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(

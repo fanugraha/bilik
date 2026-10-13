@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../components/kartu.dart';
+import '../../components/langkah.dart';
+import '../../components/latar.dart';
 import '../../components/lencana.dart';
 import '../../components/pesan.dart';
 import '../../core/theme.dart';
@@ -79,94 +81,144 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Masuk Ujian'),
-        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
-      ),
-      body: _data == null ? _bangunFormKode() : _bangunPilihNama(_data!),
+      backgroundColor: BilikWarna.kertas,
+      body: _data == null ? _formKode() : _pilih(_data!),
     );
   }
 
-  Widget _bangunFormKode() {
+  Widget _formKode() {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.zero,
       children: [
-        Kartu(
+        HeaderGradient(
+          ikon: Icons.key_outlined,
+          tinggiMinimum: 210,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Kode ujian', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              const SizedBox(height: 4),
-              const Text('Masukkan kode 6 karakter yang ditampilkan guru.', style: TextStyle(fontSize: 13, color: BilikWarna.tinta2)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _kodeController,
-                textCapitalization: TextCapitalization.characters,
-                maxLength: 6,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: 8),
-                decoration: const InputDecoration(hintText: 'ABC123', counterText: ''),
-                onSubmitted: (_) => _cariKode(),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Pesan(_error!, jenis: JenisPesan.error),
-              ],
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _memuat ? null : _cariKode,
-                child: _memuat
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Cari ujian'),
-              ),
+              const MerekBilik(terang: true),
+              const SizedBox(height: 24),
+              const Text('Masuk Ujian', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              Text('Masukkan kode 6 karakter dari guru.', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
+              const SizedBox(height: 18),
+              const LangkahUjian(aktif: 1, terang: true),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _bangunPilihNama(JoinData data) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Kartu(
-          judul: data.ujian.judul,
-          deskripsi: [if (data.ujian.mapel != null) data.ujian.mapel!, '${data.ujian.durasi} menit'].join(', '),
-          padding: const EdgeInsets.all(16),
-          child: const Row(
-            children: [
-              Icon(Icons.touch_app_outlined, size: 18, color: BilikWarna.tinta2),
-              SizedBox(width: 8),
-              Expanded(child: Text('Pilih nama Anda di daftar bawah.', style: TextStyle(fontSize: 13, color: BilikWarna.tinta2))),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        for (final kelas in data.kelas) ...[
-          Kartu(
-            judul: kelas.nama,
-            padding: EdgeInsets.zero,
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Kartu(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var i = 0; i < kelas.siswa.length; i++) ...[
-                  if (i > 0) const Divider(height: 1),
-                  _barisSiswa(kelas, kelas.siswa[i]),
+                const Text('Kode ujian', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _kodeController,
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 6,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: 10),
+                  decoration: const InputDecoration(hintText: 'ABC123', counterText: ''),
+                  onSubmitted: (_) => _cariKode(),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Pesan(_error!, jenis: JenisPesan.error),
                 ],
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _memuat ? null : _cariKode,
+                  child: _memuat
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Cari ujian'),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-        ],
-        TextButton.icon(
-          onPressed: () => setState(() {
-            _data = null;
-            _error = null;
-          }),
-          icon: const Icon(Icons.arrow_back, size: 18),
-          label: const Text('Ganti kode ujian'),
         ),
       ],
+    );
+  }
+
+  Widget _pilih(JoinData data) {
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        HeaderGradient(
+          ikon: Icons.groups_outlined,
+          tinggiMinimum: 196,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const MerekBilik(terang: true),
+              const SizedBox(height: 22),
+              Text(data.ujian.judul, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _metaPil(Icons.timer_outlined, '${data.ujian.durasi} menit'),
+                  if (data.ujian.mapel != null) ...[
+                    const SizedBox(width: 8),
+                    _metaPil(Icons.menu_book_outlined, data.ujian.mapel!),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              const LangkahUjian(aktif: 2, terang: true),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Pilih nama Anda', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: BilikWarna.tinta)),
+              const SizedBox(height: 12),
+              for (final kelas in data.kelas) ...[
+                Kartu(
+                  judul: kelas.nama,
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < kelas.siswa.length; i++) ...[
+                        if (i > 0) const Divider(height: 1),
+                        _barisSiswa(kelas, kelas.siswa[i]),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextButton.icon(
+                onPressed: () => setState(() {
+                  _data = null;
+                  _error = null;
+                }),
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: const Text('Ganti kode ujian'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _metaPil(IconData ikon, String teks) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(ikon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(teks, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 
@@ -210,9 +262,7 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
                 ],
               ),
             ),
-            siswa.terpakai
-                ? const Lencana('Terpakai', nada: NadaLencana.merah)
-                : const Icon(Icons.chevron_right, color: BilikWarna.tinta3),
+            siswa.terpakai ? const Lencana('Terpakai', nada: NadaLencana.merah) : const Icon(Icons.chevron_right, color: BilikWarna.tinta3),
           ],
         ),
       ),
