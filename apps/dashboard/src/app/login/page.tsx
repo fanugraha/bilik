@@ -38,6 +38,10 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ er
           <Link href="/register" className="font-semibold text-nila hover:text-nila-tua">
             Daftar sebagai guru
           </Link>
+          <span className="mx-1.5 text-tinta-3">·</span>
+          <Link href="/unduh" className="font-semibold text-nila hover:text-nila-tua">
+            Unduh aplikasi siswa
+          </Link>
         </>
       }
     >
