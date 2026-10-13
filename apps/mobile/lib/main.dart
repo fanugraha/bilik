@@ -11,5 +11,6 @@ Future<void> main() async {
     await BilikSupabase.init();
   }
 
+  // Splash screen yang menentukan lanjut ke lobby (ada sesi) atau join.
   runApp(const ProviderScope(child: BilikApp()));
 }

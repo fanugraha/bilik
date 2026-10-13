@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateSoal } from "@/actions/soal";
-import { FormSoal, type NilaiAwalSoal } from "@/components/form-soal";
+import { FormSoal, type NilaiAwalSoal } from "@/components/soal/form-soal";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
 import { KepalaHalaman } from "@/components/ui/kepala-halaman";
@@ -20,12 +20,15 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: soal } = await supabase
-    .from("soal")
-    .select("tipe, teks, opsi, kunci, pedoman, bobot, jawaban_benar, penjelasan")
-    .eq("id", id)
-    .eq("guru_id", user.id)
-    .single();
+  const [{ data: soal }, { data: daftarBank }] = await Promise.all([
+    supabase
+      .from("soal")
+      .select("tipe, teks, opsi, kunci, pedoman, bobot, jawaban_benar, penjelasan, bank_soal_id")
+      .eq("id", id)
+      .eq("guru_id", user.id)
+      .single(),
+    supabase.from("bank_soal").select("id, nama").eq("guru_id", user.id).order("nama", { ascending: true }),
+  ]);
 
   if (!soal) redirect("/dashboard/soal");
 
@@ -39,17 +42,25 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
     jawaban_benar: soal.jawaban_benar,
     penjelasan: soal.penjelasan,
     pedoman: soal.pedoman,
+    bank_soal_id: soal.bank_soal_id,
   };
+
+  const bankSoal = (daftarBank ?? []).find((bank) => bank.id === soal.bank_soal_id);
 
   return (
     <>
+      <KepalaHalaman
+        judul="Ubah soal"
+        deskripsi="Perubahan berlaku di semua ujian yang memakai soal ini."
+        kembali={bankSoal ? { href: `/dashboard/soal/bank/${bankSoal.id}`, teks: bankSoal.nama } : { href: "/dashboard/soal", teks: "Bank soal" }}
+      />
       {error && (
         <div className="mb-4">
           <Pesan jenis="error">{error}</Pesan>
         </div>
       )}
       <Kartu>
-        <FormSoal aksi={updateSoal} teksSimpan="Simpan perubahan" idSoal={id} nilaiAwal={nilaiAwal} />
+        <FormSoal aksi={updateSoal} teksSimpan="Simpan perubahan" idSoal={id} nilaiAwal={nilaiAwal} daftarBank={daftarBank ?? []} />
       </Kartu>
     </>
   );
@@ -58,11 +69,6 @@ async function FormUbahSoal({ params, searchParams }: { params: Promise<{ id: st
 export default function UbahSoalPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   return (
     <div className="max-w-3xl">
-      <KepalaHalaman
-        judul="Ubah soal"
-        deskripsi="Perubahan berlaku di semua ujian yang memakai soal ini."
-        kembali={{ href: "/dashboard/soal", teks: "Bank soal" }}
-      />
       <Suspense fallback={<p className="text-sm text-tinta-2">Memuat soal...</p>}>
         <FormUbahSoal params={params} searchParams={searchParams} />
       </Suspense>

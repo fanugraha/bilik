@@ -1,6 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Wajib untuk build release: tanpa ini app tak bisa menghubungi server
+         (debug/profile mendapat izin INTERNET dari manifest masing-masing). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Dipakai connectivity_plus untuk menandai offline saat ujian -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application
-        android:label="bilik_mobile"
+        android:label="Bilik"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

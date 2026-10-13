@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createKelas, updateKelas, deleteKelas } from "@/actions/kelas";
 import { Tombol } from "@/components/ui/button";
 import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
+import { TautanTombol } from "@/components/ui/tautan-tombol";
+import { Ikon } from "@/components/ui/ikon";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
 import { KepalaHalaman } from "@/components/ui/kepala-halaman";
@@ -74,38 +76,39 @@ async function DaftarKelas({ searchParams }: { searchParams: Promise<{ error?: s
                     </span>
                   </Link>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
+                  <div className="flex items-center gap-1">
+                    <TautanTombol
                       href={`/dashboard/kelas/${kelas.id}/siswa`}
-                      className="inline-flex h-8 items-center rounded-lg bg-nila-muda px-3 text-xs font-semibold text-nila hover:bg-nila hover:text-white"
-                    >
-                      {jumlahSiswa === 0 ? "Masukkan siswa" : "Kelola siswa"}
-                    </Link>
+                      teks={jumlahSiswa === 0 ? "Masukkan siswa" : "Kelola siswa"}
+                      jenis="kedua"
+                      ukuran="kecil"
+                    />
 
                     <details className="group relative">
-                      <summary className="inline-flex h-8 cursor-pointer list-none items-center rounded-lg px-3 text-xs font-semibold text-tinta-2 hover:bg-kertas">
-                        Ganti nama
-                      </summary>
-                      <form
-                        action={updateKelas}
-                        className="absolute right-0 z-10 mt-1 flex w-72 gap-2 rounded-lg border border-garis bg-permukaan p-3 shadow-lg"
+                      <summary
+                        aria-label={`Aksi lain untuk kelas ${kelas.nama}`}
+                        className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg text-tinta-2 hover:bg-kertas"
                       >
-                        <input type="hidden" name="id" value={kelas.id} />
-                        <input type="text" name="nama" defaultValue={kelas.nama} required aria-label="Nama kelas" className="bidang" />
-                        <Tombol teks="Simpan" ukuran="kecil" teksProses="..." />
-                      </form>
+                        <Ikon nama="lainnya" className="h-4 w-4" />
+                      </summary>
+                      <div className="absolute right-0 z-10 mt-1 w-64 space-y-3 rounded-lg border border-garis bg-permukaan p-3 shadow-lg">
+                        <form action={updateKelas} className="flex gap-2">
+                          <input type="hidden" name="id" value={kelas.id} />
+                          <input type="text" name="nama" defaultValue={kelas.nama} required aria-label="Nama kelas" className="bidang" />
+                          <Tombol teks="Simpan" ukuran="kecil" teksProses="..." />
+                        </form>
+                        <form action={deleteKelas} className="border-t border-garis pt-3">
+                          <input type="hidden" name="id" value={kelas.id} />
+                          <TombolKonfirmasi
+                            teks="Hapus kelas"
+                            jenis="hantu"
+                            ukuran="kecil"
+                            pesanKonfirmasi={`Hapus kelas ${kelas.nama}? ${jumlahSiswa} siswa dan data ujian mereka ikut terhapus permanen.`}
+                            className="w-full justify-start hover:text-merah"
+                          />
+                        </form>
+                      </div>
                     </details>
-
-                    <form action={deleteKelas}>
-                      <input type="hidden" name="id" value={kelas.id} />
-                      <TombolKonfirmasi
-                        teks="Hapus"
-                        jenis="hantu"
-                        ukuran="kecil"
-                        pesanKonfirmasi={`Hapus kelas ${kelas.nama}? ${jumlahSiswa} siswa dan data ujian mereka ikut terhapus permanen.`}
-                        className="hover:text-merah"
-                      />
-                    </form>
                   </div>
                 </li>
               );

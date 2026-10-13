@@ -1,6 +1,8 @@
 // Pembaca data impor siswa. Dipakai dua kali dengan kode yang sama:
 // di browser untuk pratinjau, dan di server action untuk validasi ulang sebelum simpan.
 
+import { rapikanNamaOrang } from "./nama";
+
 export const BATAS_BARIS_IMPOR = 200;
 export const PANJANG_NAMA_MAKS = 100;
 const NO_ABSEN_MAKS = 999;
@@ -117,7 +119,7 @@ export function bacaDataImpor(teksMentah: string, listSiswaAda: { no_absen: numb
 
   const jumlahPerNoAbsen = new Map<number, number>();
   const listBaris: BarisImpor[] = listSelPerBaris.map((listSel, indeks) => {
-    const nama = (listSel[kolomNama] ?? "").replace(/\s+/g, " ").trim();
+    const nama = rapikanNamaOrang(listSel[kolomNama] ?? "");
     const teksNoAbsen = kolomNoAbsen === -1 ? "" : (listSel[kolomNoAbsen] ?? "").trim();
     const noAbsen = adalahAngka(teksNoAbsen) ? parseInt(teksNoAbsen) : null;
     const baris: BarisImpor = { nomorBaris: indeks + nomorBarisAwal, noAbsen, nama, status: "baru", pesan: "" };

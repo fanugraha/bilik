@@ -3,6 +3,7 @@ class Jawaban {
   final String pesertaId;
   final String soalId;
   final String? isi;
+  final String? alasan;
   final bool raguRagu;
   final DateTime? diterimaAt;
 
@@ -10,6 +11,7 @@ class Jawaban {
     required this.pesertaId,
     required this.soalId,
     this.isi,
+    this.alasan,
     this.raguRagu = false,
     this.diterimaAt,
   });
@@ -18,6 +20,7 @@ class Jawaban {
         'peserta_id': pesertaId,
         'soal_id': soalId,
         'isi': isi,
+        'alasan': alasan,
         'ragu_ragu': raguRagu,
       };
 
@@ -25,6 +28,7 @@ class Jawaban {
         pesertaId: json['peserta_id'] as String,
         soalId: json['soal_id'] as String,
         isi: json['isi'] as String?,
+        alasan: json['alasan'] as String?,
         raguRagu: json['ragu_ragu'] as bool? ?? false,
         diterimaAt: json['diterima_at'] == null
             ? null

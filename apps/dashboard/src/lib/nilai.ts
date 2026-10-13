@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ambilSatu, type RelasiSatu } from "./relasi";
 
 export type TipeSoal = "pg" | "essay" | "benar_salah";
 
@@ -13,6 +14,7 @@ export type SoalUjian = {
 export type JawabanPeserta = {
   soalId: string;
   isi: string | null;
+  alasan: string | null;
   skor: number | null;
 };
 
@@ -38,12 +40,76 @@ export type RekapNilai = {
   listBaris: BarisRekap[];
 };
 
-type RelasiSatu<T> = T | T[] | null;
+export type StatSoal = {
+  soal: SoalUjian;
+  benar: number; // PG & B/S: skor penuh
+  salah: number; // PG & B/S: dijawab tapi belum penuh
+  kosong: number; // tak dijawab
+  belumDikoreksi: number; // essay yang belum diberi skor
+  rataRataSkor: number | null; // rata-rata skor soal (yang sudah dinilai)
+  persenBenar: number | null; // PG & B/S saja
+};
 
-// Supabase bisa mengembalikan relasi sebagai objek atau array, tergantung tipe FK.
-function ambilSatu<T>(relasi: RelasiSatu<T>): T | null {
-  if (Array.isArray(relasi)) return relasi[0] ?? null;
-  return relasi;
+// Ringkasan per soal untuk halaman nilai.
+export function rekapPerSoal(listSoal: SoalUjian[], listBaris: BarisRekap[]): StatSoal[] {
+  return listSoal.map((soal) => {
+    let benar = 0;
+    let salah = 0;
+    let kosong = 0;
+    let belumDikoreksi = 0;
+    let jumlahSkor = 0;
+    let jumlahDinilai = 0;
+
+    for (const baris of listBaris) {
+      const jawaban = baris.listJawaban.find((item) => item.soalId === soal.soalId);
+      const kosongkan = !jawaban || jawaban.isi === null || jawaban.isi === "";
+
+      if (soal.tipe === "essay") {
+        if (kosongkan) kosong++;
+        else if (jawaban!.skor === null) belumDikoreksi++;
+        else {
+          jumlahSkor += jawaban!.skor;
+          jumlahDinilai++;
+        }
+        continue;
+      }
+
+      if (kosongkan) {
+        kosong++;
+      } else if ((jawaban!.skor ?? 0) >= soal.bobot) {
+        benar++;
+      } else {
+        salah++;
+      }
+    }
+
+    const dijawab = benar + salah + jumlahDinilai + belumDikoreksi;
+    const rataRataSkor = jumlahDinilai > 0 ? Math.round((jumlahSkor / jumlahDinilai) * 100) / 100 : null;
+    const persenBenar = soal.tipe === "essay" ? null : dijawab > 0 ? Math.round((benar / dijawab) * 1000) / 10 : 0;
+
+    return { soal, benar, salah, kosong, belumDikoreksi, rataRataSkor, persenBenar };
+  });
+}
+
+export type SebaranNilai = { label: string; jumlah: number };
+
+// Sebaran nilai 0-100 dalam 10 rentang, untuk histogram.
+export function sebaranNilai(listBaris: BarisRekap[]): SebaranNilai[] {
+  const label = ["0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-100"];
+  const jumlah = new Array(10).fill(0);
+  for (const baris of listBaris) {
+    const indeks = Math.min(9, Math.max(0, Math.floor(baris.nilai / 10)));
+    jumlah[indeks]++;
+  }
+  return label.map((teks, i) => ({ label: teks, jumlah: jumlah[i] }));
+}
+
+/** Rata-rata nilai (1 desimal). */
+export function rataRataNilai(listBaris: BarisRekap[]): number {
+  if (listBaris.length === 0) return 0;
+  let jumlah = 0;
+  for (const baris of listBaris) jumlah += baris.nilai;
+  return Math.round((jumlah / listBaris.length) * 10) / 10;
 }
 
 export async function ambilRekapNilai(
@@ -88,7 +154,7 @@ export async function ambilRekapNilai(
   const listPesertaId = (dataPeserta ?? []).map((peserta) => peserta.id);
 
   const { data: dataJawaban } = listPesertaId.length
-    ? await supabase.from("jawaban").select("peserta_id, soal_id, isi, skor").in("peserta_id", listPesertaId)
+    ? await supabase.from("jawaban").select("peserta_id, soal_id, isi, alasan, skor").in("peserta_id", listPesertaId)
     : { data: [] };
 
   const tipePerSoal = new Map(listSoal.map((soal) => [soal.soalId, soal.tipe]));
@@ -103,6 +169,7 @@ export async function ambilRekapNilai(
       .map((jawaban) => ({
         soalId: jawaban.soal_id,
         isi: jawaban.isi,
+        alasan: jawaban.alasan,
         skor: jawaban.skor === null ? null : Number(jawaban.skor),
       }));
 

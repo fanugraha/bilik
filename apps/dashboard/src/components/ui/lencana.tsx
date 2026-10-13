@@ -54,6 +54,11 @@ export function LencanaStatusUjian({ status }: { status: string }) {
   );
 }
 
+// Label status ujian dipakai juga oleh penyaring daftar, agar teksnya seragam dengan lencana
+export function teksStatusUjian(status: string) {
+  return statusUjian[status]?.teks ?? status;
+}
+
 export function LencanaStatusPeserta({ status }: { status: string }) {
   const gaya = statusPeserta[status] ?? { teks: status, nada: "abu" as NadaLencana };
   return <Lencana nada={gaya.nada}>{gaya.teks}</Lencana>;

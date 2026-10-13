@@ -26,6 +26,11 @@ class ExamGuardIos implements ExamGuard {
   }
 
   @override
+  Future<void> setActive(bool aktif) async {
+    // iOS: pelaporan sudah aktif lewat observer; tak perlu penanda tambahan.
+  }
+
+  @override
   Stream<ViolationType> get violations => _eventChannel
       .receiveBroadcastStream()
       .map((event) => _mapViolation(event as String?));

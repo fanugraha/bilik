@@ -3,12 +3,16 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ambilSatu, type RelasiSatu } from "@/lib/relasi";
+import { hitungStatusPeserta, hitungTerjawabPerPeserta, ringkasanStatusUjian } from "@/lib/ruang-kontrol";
 import {
   setujuiPeserta,
   setujuiSemuaPeserta,
   mulaiUjian,
   akhiriUjian,
   beriKodeBuka,
+  bukaLangsung,
+  bukaLangsungSemua,
   tolakPeserta,
   resetPerangkat,
   tambahWaktu,
@@ -22,16 +26,14 @@ import { KeadaanKosong } from "@/components/ui/keadaan-kosong";
 import { LencanaStatusPeserta, LencanaStatusUjian, Lencana } from "@/components/ui/lencana";
 import { TautanTombol } from "@/components/ui/tautan-tombol";
 import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
-import { PemantauRealtime } from "@/components/pemantau-realtime";
-import { PapanKode } from "@/components/papan-kode";
-import { HitungMundur } from "@/components/hitung-mundur";
+import { PemantauRealtime } from "@/components/ujian/pemantau-realtime";
+import { PapanKode } from "@/components/ujian/papan-kode";
+import { HitungMundur } from "@/components/ujian/hitung-mundur";
 import { JamLokal } from "@/components/ui/jam-lokal";
 
 export const metadata: Metadata = { title: "Ruang kontrol" };
 
 type ParamRuangKontrol = { error?: string; sukses?: string; kode_buka?: string; nama?: string };
-
-type RelasiSatu<T> = T | T[] | null;
 
 type PesertaItem = {
   id: string;
@@ -42,12 +44,6 @@ type PesertaItem = {
   selesai_at: string | null;
   siswa: RelasiSatu<{ nama: string; no_absen: number | null; kelas: RelasiSatu<{ nama: string }> }>;
 };
-
-type ItemRingkasan = { teks: string; jumlah: number; dari?: number; warna: string };
-
-function ambilSatu<T>(relasi: RelasiSatu<T>): T | null {
-  return Array.isArray(relasi) ? (relasi[0] ?? null) : relasi;
-}
 
 // Tombol di atas papan gelap
 const kelasTombolPapanUtama = "bg-white! text-papan! hover:bg-nila-muda!";
@@ -95,38 +91,21 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
     ? await supabase.from("jawaban").select("peserta_id").in("peserta_id", listPesertaId).not("isi", "is", null)
     : { data: [] };
 
-  const jumlahTerjawabPerPeserta = new Map<string, number>();
-  for (const jawaban of listJawabanTerisi ?? []) {
-    jumlahTerjawabPerPeserta.set(jawaban.peserta_id, (jumlahTerjawabPerPeserta.get(jawaban.peserta_id) ?? 0) + 1);
-  }
-
-  let jumlahMenungguPersetujuan = 0;
-  let jumlahDisetujui = 0;
-  const jumlahPerStatus = new Map<string, number>();
-  for (const peserta of listPeserta) {
-    if (peserta.disetujui) jumlahDisetujui++;
-    else jumlahMenungguPersetujuan++;
-    jumlahPerStatus.set(peserta.status, (jumlahPerStatus.get(peserta.status) ?? 0) + 1);
-  }
+  const jumlahTerjawabPerPeserta = hitungTerjawabPerPeserta(listJawabanTerisi ?? []);
+  const ringkasan = hitungStatusPeserta(listPeserta);
+  const { jumlahMenungguPersetujuan, jumlahDisetujui } = ringkasan;
   const listTerkunci = listPeserta.filter((peserta) => peserta.status === "terkunci");
 
   const { error: errorQuery, sukses: pesanSukses, kode_buka: kodeBuka, nama: namaKodeBuka } = await searchParams;
   const aktif = ujian.status === "lobby" || ujian.status === "berjalan";
 
-  const ringkasanStatus: ItemRingkasan[] =
-    ujian.status === "lobby"
-      ? [
-          { teks: "Sudah masuk", jumlah: listPeserta.length, dari: jumlahSiswaTerdaftar ?? 0, warna: "text-tinta" },
-          { teks: "Menunggu persetujuan", jumlah: jumlahMenungguPersetujuan, warna: "text-biru" },
-          { teks: "Disetujui", jumlah: jumlahDisetujui, warna: "text-hijau" },
-          { teks: "Soal", jumlah: jumlahSoal ?? 0, warna: "text-tinta" },
-        ]
-      : [
-          { teks: "Mengerjakan", jumlah: jumlahPerStatus.get("mengerjakan") ?? 0, warna: "text-hijau" },
-          { teks: "Terkunci", jumlah: jumlahPerStatus.get("terkunci") ?? 0, warna: "text-merah" },
-          { teks: "Selesai", jumlah: jumlahPerStatus.get("selesai") ?? 0, warna: "text-tinta-2" },
-          { teks: "Belum disetujui", jumlah: jumlahMenungguPersetujuan, warna: "text-biru" },
-        ];
+  const ringkasanStatus = ringkasanStatusUjian({
+    statusUjian: ujian.status,
+    jumlahPeserta: listPeserta.length,
+    jumlahSiswaTerdaftar: jumlahSiswaTerdaftar ?? 0,
+    jumlahSoal: jumlahSoal ?? 0,
+    ringkasan,
+  });
 
   return (
     <>
@@ -135,7 +114,7 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
         deskripsi={
           <span className="inline-flex flex-wrap items-center gap-3">
             <LencanaStatusUjian status={ujian.status} />
-            {aktif && <PemantauRealtime ujianId={ujianId} listPesertaId={listPesertaId} />}
+            {aktif && <PemantauRealtime ujianId={ujianId} />}
           </span>
         }
         kembali={{ href: "/dashboard/ujian", teks: "Semua ujian" }}
@@ -230,6 +209,17 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
                     className={kelasTombolPapanKedua}
                   />
                 </form>
+                {jumlahMenungguPersetujuan > 0 && (
+                  <form action={setujuiSemuaPeserta}>
+                    <input type="hidden" name="ujian_id" value={ujianId} />
+                    <Tombol
+                      teks={`Setujui semua (${jumlahMenungguPersetujuan})`}
+                      jenis="kedua"
+                      teksProses="Menyetujui..."
+                      className={kelasTombolPapanKedua}
+                    />
+                  </form>
+                )}
               </>
             )}
           </PapanKode>
@@ -254,6 +244,19 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
             className="border-merah/30"
             tanpaPadding
           >
+            <form
+              action={bukaLangsungSemua}
+              className="flex flex-wrap items-center justify-between gap-3 border-b border-garis bg-merah-muda/40 px-5 py-3"
+            >
+              <span className="text-xs text-tinta-2">Satu kelas kena gangguan? Buka semua kunci sekaligus.</span>
+              <input type="hidden" name="ujian_id" value={ujianId} />
+              <TombolKonfirmasi
+                teks={`Buka semua (${listTerkunci.length})`}
+                jenis="bahaya"
+                ukuran="kecil"
+                pesanKonfirmasi={`Buka kunci ${listTerkunci.length} siswa sekaligus tanpa kode?`}
+              />
+            </form>
             <ul className="divide-y divide-garis">
               {listTerkunci.map((peserta) => {
                 const siswa = ambilSatu(peserta.siswa);
@@ -264,11 +267,23 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
                       <span className="font-semibold text-tinta">{siswa?.nama}</span>
                       <span className="text-sm text-tinta-2">{peserta.jumlah_pelanggaran} pelanggaran</span>
                     </span>
-                    <form action={beriKodeBuka}>
-                      <input type="hidden" name="ujian_id" value={ujianId} />
-                      <input type="hidden" name="peserta_id" value={peserta.id} />
-                      <Tombol teks="Beri kode buka" jenis="bahaya" ukuran="kecil" teksProses="Membuat kode..." />
-                    </form>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <form action={beriKodeBuka}>
+                        <input type="hidden" name="ujian_id" value={ujianId} />
+                        <input type="hidden" name="peserta_id" value={peserta.id} />
+                        <Tombol teks="Beri kode buka" jenis="kedua" ukuran="kecil" teksProses="Membuat kode..." />
+                      </form>
+                      <form action={bukaLangsung}>
+                        <input type="hidden" name="ujian_id" value={ujianId} />
+                        <input type="hidden" name="peserta_id" value={peserta.id} />
+                        <TombolKonfirmasi
+                          teks="Buka langsung"
+                          jenis="bahaya"
+                          ukuran="kecil"
+                          pesanKonfirmasi={`Buka kunci ${siswa?.nama ?? "siswa ini"} tanpa kode?`}
+                        />
+                      </form>
+                    </div>
                   </li>
                 );
               })}

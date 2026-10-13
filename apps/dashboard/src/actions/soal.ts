@@ -3,8 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { amankanTujuanKembali } from "@/lib/alur";
 
 const HURUF_OPSI = ["A", "B", "C", "D", "E"];
+
+// Rapikan teks soal: samakan akhir baris jadi \n lalu potong spasi ujung,
+// agar baris baru yang diketik guru tidak hilang / campur CRLF.
+function rapikanTeks(v: unknown): string {
+  return String(v ?? "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+}
 
 // Opsi harus berurutan (A, B, C, ...). Ada celah (mis. A, B, D) membuat huruf kunci
 // tidak cocok lagi dengan posisi opsi yang tersimpan, jadi ditolak.
@@ -13,7 +22,7 @@ function ambilOpsi(formData: FormData): { opsi: string[]; adaCelah: boolean } {
   let sudahKosong = false;
   let adaCelah = false;
   for (const huruf of HURUF_OPSI) {
-    const isi = (formData.get(`opsi_${huruf}`) as string)?.trim();
+    const isi = rapikanTeks(formData.get(`opsi_${huruf}`));
     if (!isi) {
       sudahKosong = true;
       continue;
@@ -32,6 +41,46 @@ function cekOpsiPg(opsi: string[], adaCelah: boolean, kunci: string | null): str
   return null;
 }
 
+// Bank soal wajib dan harus milik guru sendiri (FK tidak cek RLS, jadi dicek manual).
+async function bankMilik(supabase: Awaited<ReturnType<typeof createClient>>, guruId: string, bankId: string | null) {
+  if (!bankId) return null;
+  const { data } = await supabase.from("bank_soal").select("id").eq("id", bankId).eq("guru_id", guruId).maybeSingle();
+  return data?.id ?? null;
+}
+
+// Isian soal sesuai tipe. Kolom milik tipe lain dikosongkan agar soal yang ganti tipe tidak membawa sisa data.
+function susunIsianSoal(formData: FormData): { isian: Record<string, unknown> } | { error: string } {
+  const tipe = formData.get("tipe") as string;
+  const teks = rapikanTeks(formData.get("teks"));
+  const bobot = parseFloat(formData.get("bobot") as string) || 1;
+
+  if (!teks) return { error: "Teks soal wajib diisi" };
+
+  if (tipe === "pg") {
+    const { opsi, adaCelah } = ambilOpsi(formData);
+    const kunci = formData.get("kunci") as string | null;
+    const pesanOpsi = cekOpsiPg(opsi, adaCelah, kunci);
+    if (pesanOpsi) return { error: pesanOpsi };
+    return { isian: { tipe: "pg", teks, opsi, kunci, pedoman: null, jawaban_benar: null, penjelasan: null, bobot } };
+  }
+  if (tipe === "benar_salah") {
+    const jawabanBenar = formData.get("jawaban_benar") === "true";
+    const penjelasan = rapikanTeks(formData.get("penjelasan")) || null;
+    return { isian: { tipe: "benar_salah", teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null } };
+  }
+  const pedoman = rapikanTeks(formData.get("pedoman")) || null;
+  return { isian: { tipe: "essay", teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null } };
+}
+
+function halamanTulisSoal(bankId: string | null, kembali: string | null, pesan: { error?: string; sukses?: string }) {
+  const param = new URLSearchParams();
+  if (bankId) param.set("bank", bankId);
+  if (kembali) param.set("kembali", kembali);
+  if (pesan.error) param.set("error", pesan.error);
+  if (pesan.sukses) param.set("sukses", pesan.sukses);
+  return `/dashboard/soal/buat?${param.toString()}`;
+}
+
 export async function createSoal(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -40,52 +89,21 @@ export async function createSoal(formData: FormData) {
 
   if (!user) redirect("/login");
 
-  const tipe = formData.get("tipe") as string;
-  const teks = (formData.get("teks") as string)?.trim();
-  const bobot = parseFloat(formData.get("bobot") as string) || 1;
+  const bankDiminta = (formData.get("bank_soal_id") as string) || null;
+  const kembali = amankanTujuanKembali(formData.get("kembali") as string);
+  const bankId = await bankMilik(supabase, user.id, bankDiminta);
+  if (!bankId) redirect(halamanTulisSoal(bankDiminta, kembali, { error: "Pilih bank soal untuk soal ini" }));
 
-  if (!teks) redirect("/dashboard/soal/buat?error=" + encodeURIComponent("Teks soal wajib diisi"));
+  const hasil = susunIsianSoal(formData);
+  if ("error" in hasil) redirect(halamanTulisSoal(bankId, kembali, { error: hasil.error }));
 
-  if (tipe === "pg") {
-    const { opsi, adaCelah } = ambilOpsi(formData);
-    const kunci = formData.get("kunci") as string | null;
-    const pesanOpsi = cekOpsiPg(opsi, adaCelah, kunci);
-    if (pesanOpsi) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(pesanOpsi));
-    const { error } = await supabase.from("soal").insert({
-      guru_id: user.id,
-      tipe: "pg",
-      teks,
-      opsi,
-      kunci,
-      bobot,
-    });
-    if (error) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(error.message));
-  } else if (tipe === "benar_salah") {
-    const jawabanBenar = formData.get("jawaban_benar") === "true";
-    const penjelasan = (formData.get("penjelasan") as string)?.trim() || null;
-    const { error } = await supabase.from("soal").insert({
-      guru_id: user.id,
-      tipe: "benar_salah",
-      teks,
-      jawaban_benar: jawabanBenar,
-      penjelasan,
-      bobot,
-    });
-    if (error) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(error.message));
-  } else {
-    const pedoman = (formData.get("pedoman") as string)?.trim() || null;
-    const { error } = await supabase.from("soal").insert({
-      guru_id: user.id,
-      tipe: "essay",
-      teks,
-      pedoman,
-      bobot,
-    });
-    if (error) redirect("/dashboard/soal/buat?error=" + encodeURIComponent(error.message));
-  }
+  const { error } = await supabase.from("soal").insert({ ...hasil.isian, guru_id: user.id, bank_soal_id: bankId });
+  if (error) redirect(halamanTulisSoal(bankId, kembali, { error: error.message }));
 
   revalidatePath("/dashboard/soal");
-  redirect("/dashboard/soal");
+  if (formData.get("lanjut") === "lagi") redirect(halamanTulisSoal(bankId, kembali, { sukses: "Soal disimpan. Tulis soal berikutnya." }));
+  if (kembali) redirect(kembali);
+  redirect(`/dashboard/soal/bank/${bankId}?sukses=` + encodeURIComponent("Soal disimpan"));
 }
 
 export async function updateSoal(formData: FormData) {
@@ -97,38 +115,24 @@ export async function updateSoal(formData: FormData) {
   if (!user) redirect("/login");
 
   const id = formData.get("id") as string;
-  const tipe = formData.get("tipe") as string;
-  const teks = (formData.get("teks") as string)?.trim();
-  const bobot = parseFloat(formData.get("bobot") as string) || 1;
+  const halamanUbah = (pesan: string) => `/dashboard/soal/${id}/ubah?error=` + encodeURIComponent(pesan);
 
-  if (!teks) redirect(`/dashboard/soal/${id}/ubah?error=` + encodeURIComponent("Teks soal wajib diisi"));
+  const bankId = await bankMilik(supabase, user.id, (formData.get("bank_soal_id") as string) || null);
+  if (!bankId) redirect(halamanUbah("Pilih bank soal untuk soal ini"));
 
-  let payload: Record<string, unknown>;
-  if (tipe === "pg") {
-    const { opsi, adaCelah } = ambilOpsi(formData);
-    const kunci = formData.get("kunci") as string | null;
-    const pesanOpsi = cekOpsiPg(opsi, adaCelah, kunci);
-    if (pesanOpsi) redirect(`/dashboard/soal/${id}/ubah?error=` + encodeURIComponent(pesanOpsi));
-    payload = { tipe: "pg", teks, opsi, kunci, pedoman: null, jawaban_benar: null, penjelasan: null, bobot };
-  } else if (tipe === "benar_salah") {
-    const jawabanBenar = formData.get("jawaban_benar") === "true";
-    const penjelasan = (formData.get("penjelasan") as string)?.trim() || null;
-    payload = { tipe: "benar_salah", teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null };
-  } else {
-    const pedoman = (formData.get("pedoman") as string)?.trim() || null;
-    payload = { tipe: "essay", teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null };
-  }
+  const hasil = susunIsianSoal(formData);
+  if ("error" in hasil) redirect(halamanUbah(hasil.error));
 
   const { error } = await supabase
     .from("soal")
-    .update(payload)
+    .update({ ...hasil.isian, bank_soal_id: bankId })
     .eq("id", id)
     .eq("guru_id", user.id);
 
-  if (error) redirect(`/dashboard/soal/${id}/ubah?error=` + encodeURIComponent(error.message));
+  if (error) redirect(halamanUbah(error.message));
 
   revalidatePath("/dashboard/soal");
-  redirect("/dashboard/soal");
+  redirect(`/dashboard/soal/bank/${bankId}?sukses=` + encodeURIComponent("Perubahan soal disimpan"));
 }
 
 export async function deleteSoal(formData: FormData) {
@@ -140,10 +144,12 @@ export async function deleteSoal(formData: FormData) {
   if (!user) redirect("/login");
 
   const id = formData.get("id") as string;
+  const bankId = formData.get("bank_soal_id") as string;
+  const halaman = bankId ? `/dashboard/soal/bank/${bankId}` : "/dashboard/soal";
   const { error } = await supabase.from("soal").delete().eq("id", id).eq("guru_id", user.id);
 
-  if (error) redirect("/dashboard/soal?error=" + encodeURIComponent(error.message));
+  if (error) redirect(`${halaman}?error=` + encodeURIComponent(error.message));
 
   revalidatePath("/dashboard/soal");
-  redirect("/dashboard/soal");
+  redirect(`${halaman}?sukses=` + encodeURIComponent("Soal dihapus"));
 }

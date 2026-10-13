@@ -11,7 +11,7 @@ Bilik/
 │   └── dashboard/     Next.js dashboard untuk guru
 ├── supabase/
 │   ├── migrations/    Schema database Postgres
-│   └── functions/     Edge functions (penilaian, timer, validasi)
+│   └── functions/     Edge function siswa (index router + handlers/ + lib/)
 ├── docs/              PRD dan dokumentasi
 └── catatan/           Memori proyek (disimpan otomatis ke vault hermesops)
 ```
@@ -97,24 +97,23 @@ supabase db push
 
 ## Status
 
-Setup awal selesai. Belum ada:
-- Implementasi lengkap UI dashboard (hanya scaffold)
-- Integrasi realtime Supabase di mobile & dashboard
-- Edge functions untuk timer & validasi waktu server
-- Impor CSV siswa
-- Ekspor Excel rekap nilai
-- Uji perangkat fisik (Android: Samsung/Xiaomi/Oppo, iOS: iPhone)
+Fase 0–7 **selesai**; Fase 8 (QA otomatis) selesai — tinggal uji lapangan manual.
+- **Dashboard**: auth guru (daftar/login/lupa password + login Google), kelas & siswa (+impor CSV), bank soal (PG/Benar-Salah/Essay, berkelompok), ujian, ruang kontrol realtime, penilaian (rekap per siswa & per soal, histogram, ekspor `.xlsx`). UI/UX dirapikan (beranda, kelas/siswa, bank soal, ujian) dengan alur onboarding yang mengikuti langkah guru.
+- **App siswa**: join (kode → kelas → nama), cek perangkat, lobby, pengerjaan (timer server, autosave offline, ragu-ragu, submit), anti-curang (catat pelanggaran, kunci, kode buka), UI bermerek + splash + ikon.
+- **Backend**: edge function `siswa` (join/pilih/status/soal/simpan/submit/lapor/buka), auto-tutup ujian (pg_cron), trigger pelanggaran, rate limit kode. Skema database dirapikan: master `mapel`, versi soal, validasi & RLS diperketat, view `ml_jawaban` untuk analisis/ML.
+- **Uji**: `flutter test` (mobile), `npm test` (dashboard), integration end-to-end.
 
-Lihat `docs/PRD.md` untuk detail lengkap.
+Belum: uji lapangan lintas perangkat (Samsung/Xiaomi/Oppo + iPhone), build/uji iOS, SMTP email, Leaked Password Protection. Detail: `docs/progres.md`.
 
-## Tahapan Berikutnya (PRD bagian 12)
+## Struktur folder (ringkas)
 
-1. ✅ Fondasi: proyek, database, struktur
-2. ⏳ CRUD soal & ujian di dashboard
-3. ⏳ Alur pengerjaan: lobby → persetujuan → mulai → autosave → submit
-4. ⏳ Penilaian: auto-nilai PG, koreksi essay, rekap
-5. ⏳ Anti-curang: deteksi pelanggaran, kunci layar, kode buka
-6. ⏳ Uji lapangan: 1 kelas nyata, beberapa merek HP
+- `apps/dashboard/src/app` — rute (halaman hanya merakit UI)
+- `apps/dashboard/src/actions` — server actions (mutasi data)
+- `apps/dashboard/src/components/{ui,auth,soal,siswa,ujian,layout}` — komponen UI
+- `apps/dashboard/src/lib` — util & data (`supabase/`, `nilai.ts`, `ruang-kontrol.ts`, `relasi.ts`, `impor-siswa.ts`, `mapel.ts`, `alur.ts`)
+- `apps/mobile/lib` — `core/ components/ features/ models/ services/ platform/ providers/ utils/`
+- `supabase/functions/siswa` — `index.ts` (router) + `handlers/` + `lib/`
+- `supabase/migrations` — migrasi SQL berurutan
 
 ## Lisensi
 

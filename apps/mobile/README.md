@@ -1,16 +1,46 @@
-# bilik_mobile
+# Bilik — App Siswa (Flutter)
 
-A new Flutter project.
+App ujian untuk siswa. Login tanpa akun: masuk lewat kode ujian, lalu layar dikunci selama ujian.
 
-## Getting Started
+## Menjalankan
 
-This project is a starting point for a Flutter application.
+Isi URL + anon key Supabase lewat `--dart-define` (ada di `run-dev.sh`):
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+./run-dev.sh
+# atau
+flutter run \
+  --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<anon-key>
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Build + pasang ke HP Android (MIUI perlu **Install via USB** & **Screen Pinning**):
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter build apk --debug --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+```
+
+## Struktur `lib/`
+
+- `core/` — `env`, `supabase_client`, `router`, `theme`
+- `components/` — UI reusable (`kartu`, `lencana`, `pesan`, `latar`, `langkah`)
+- `features/` — `splash/ join/ device_check/ lobby/ exam/ locked/ receipt/`
+  (widget layar ujian di `features/exam/widgets/`)
+- `models/` — `join`, `ujian`, `peserta`, `soal`, `jawaban`, `sesi`
+- `services/` — `api_siswa`, `autosave_service`, `session_store`, `sesi_aktif`
+- `platform/` — `exam_guard` (Android: screen pinning + FLAG_SECURE; iOS: Guided Access + deteksi)
+- `providers/` — state Riverpod
+- `utils/` — `format`
+
+## Catatan
+
+- Semua akses data lewat edge function `siswa` (service role); app tak menyentuh tabel langsung.
+- Kunci/pedoman soal TIDAK pernah dikirim ke app.
+- Ikon & splash digenerate dari `assets/icon` & `assets/logo` (`flutter_launcher_icons`, `flutter_native_splash`).
+
+## Uji
+
+```bash
+flutter test
+```

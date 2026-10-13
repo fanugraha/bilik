@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
+import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
 import { ambilRekapNilai } from "@/lib/nilai";
 
-// Pemisah ";" karena Excel dengan format regional Indonesia memakai koma untuk desimal.
-const PEMISAH = ";";
-
-function selCsv(nilai: string | number | null): string {
-  let teks = "";
-  if (typeof nilai === "number") teks = String(nilai).replace(".", ",");
-  else if (nilai !== null) teks = nilai;
-  // Cegah formula injection saat dibuka di Excel
-  if (typeof nilai === "string" && /^[=+\-@\t\r]/.test(teks)) teks = "'" + teks;
-  if (teks.includes(PEMISAH) || teks.includes('"') || teks.includes("\n")) {
-    teks = '"' + teks.replace(/"/g, '""') + '"';
-  }
-  return teks;
+function namaFileAman(judul: string) {
+  return judul.replace(/[^a-zA-Z0-9-_ ]/g, "").trim().replace(/\s+/g, "-") || "ujian";
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,7 +23,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     "Kelas",
     "No Absen",
     "Nama",
-    ...rekap.listSoal.map((soal, indeks) => `Soal ${indeks + 1}`),
+    ...rekap.listSoal.map((_, indeks) => `Soal ${indeks + 1}`),
     "Skor PG & B/S",
     "Skor Essay",
     "Essay Belum Dikoreksi",
@@ -43,16 +33,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     "Pelanggaran",
   ];
 
-  const listBarisCsv = [judulKolom.map(selCsv).join(PEMISAH)];
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Bilik";
+  const sheet = workbook.addWorksheet("Nilai");
+  sheet.addRow(judulKolom);
+  sheet.getRow(1).font = { bold: true };
+  sheet.views = [{ state: "frozen", ySplit: 1 }];
 
   for (const baris of rekap.listBaris) {
     const skorPerSoal = rekap.listSoal.map((soal) => {
       const jawaban = baris.listJawaban.find((item) => item.soalId === soal.soalId);
-      if (!jawaban) return 0;
-      return jawaban.skor;
+      return jawaban ? jawaban.skor : 0;
     });
 
-    const isiBaris = [
+    sheet.addRow([
       baris.namaKelas,
       baris.noAbsen,
       baris.nama,
@@ -64,17 +58,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       rekap.skorMaksimal,
       baris.nilai,
       baris.jumlahPelanggaran,
-    ];
-    listBarisCsv.push(isiBaris.map(selCsv).join(PEMISAH));
+    ]);
   }
 
-  // BOM agar Excel membaca UTF-8 dengan benar
-  const isiCsv = "﻿" + listBarisCsv.join("\r\n");
-  const namaFile = `nilai-${rekap.ujian.judul.replace(/[^a-zA-Z0-9-_ ]/g, "").trim().replace(/\s+/g, "-") || "ujian"}.csv`;
+  sheet.columns.forEach((kolom) => {
+    kolom.width = 14;
+  });
+  sheet.getColumn(3).width = 28; // Nama
 
-  return new NextResponse(isiCsv, {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const namaFile = `nilai-${namaFileAman(rekap.ujian.judul)}.xlsx`;
+
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${namaFile}"`,
       "Cache-Control": "no-store",
     },

@@ -25,6 +25,11 @@ class ExamGuardAndroid implements ExamGuard {
   }
 
   @override
+  Future<void> setActive(bool aktif) async {
+    await _channel.invokeMethod('setActive', {'aktif': aktif});
+  }
+
+  @override
   Stream<ViolationType> get violations => _eventChannel
       .receiveBroadcastStream()
       .map((event) => _mapViolation(event as String?));
@@ -34,6 +39,7 @@ class ExamGuardAndroid implements ExamGuard {
       case 'pinning_released':
         return ViolationType.pinningReleased;
       case 'window_unfocused':
+      case 'app_inactive':
         return ViolationType.appSwitch;
       case 'multi_window':
         return ViolationType.multiWindow;

@@ -148,10 +148,18 @@ async function KoreksiPeserta({ ujianId, pesertaId, searchParams }: { ujianId: s
                 )}
 
                 {soal.tipe === "benar_salah" && (
-                  <p className="mb-4 text-sm text-tinta-2">
-                    Kunci <strong className="text-tinta">{detail?.jawaban_benar ? "Benar" : "Salah"}</strong>, siswa menjawab{" "}
-                    <strong className="text-tinta">{jawaban?.isi ?? "-"}</strong>.
-                  </p>
+                  <div className="mb-4 space-y-2">
+                    <p className="text-sm text-tinta-2">
+                      Kunci <strong className="text-tinta">{detail?.jawaban_benar ? "Benar" : "Salah"}</strong>, siswa menjawab{" "}
+                      <strong className="text-tinta">{jawaban?.isi ?? "-"}</strong>.
+                    </p>
+                    <div>
+                      <p className="mb-1 text-xs font-semibold text-tinta-2">Alasan siswa</p>
+                      <div className="min-h-14 whitespace-pre-wrap rounded-lg border border-garis bg-kertas p-3 text-sm text-tinta">
+                        {jawaban?.alasan || <span className="italic text-tinta-3">Tidak diisi</span>}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {soal.tipe === "essay" && (

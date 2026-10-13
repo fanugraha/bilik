@@ -8,6 +8,7 @@ type NamaIkon =
   | "ujian"
   | "keluar"
   | "menu"
+  | "lainnya"
   | "tutup"
   | "tambah"
   | "layar-penuh"
@@ -18,8 +19,10 @@ type NamaIkon =
   | "jam"
   | "unduh"
   | "kembali"
+  | "lanjut"
   | "cari"
-  | "putar";
+  | "putar"
+  | "google";
 
 const jalurIkon: Record<NamaIkon, ReactNode> = {
   beranda: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />,
@@ -44,6 +47,13 @@ const jalurIkon: Record<NamaIkon, ReactNode> = {
   ),
   keluar: <path d="M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3M10 8l-4 4 4 4M6 12h10" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  lainnya: (
+    <>
+      <circle cx="12" cy="5.5" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="18.5" r="1.4" fill="currentColor" stroke="none" />
+    </>
+  ),
   tutup: <path d="M6 6l12 12M18 6 6 18" />,
   tambah: <path d="M12 5v14M5 12h14" />,
   "layar-penuh": <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
@@ -74,6 +84,7 @@ const jalurIkon: Record<NamaIkon, ReactNode> = {
   ),
   unduh: <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14" />,
   kembali: <path d="M14.5 6 8.5 12l6 6" />,
+  lanjut: <path d="m9.5 6 6 6-6 6" />,
   cari: (
     <>
       <circle cx="11" cy="11" r="6.5" />
@@ -81,6 +92,12 @@ const jalurIkon: Record<NamaIkon, ReactNode> = {
     </>
   ),
   putar: <path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" />,
+  google: (
+    <>
+      <path d="M21.6 12.23A9.6 9.6 0 1 1 18.9 5.6" />
+      <path d="M21.6 12.23h-9.6" />
+    </>
+  ),
 };
 
 type IkonProps = {

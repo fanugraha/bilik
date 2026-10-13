@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/jawaban.dart';
 
@@ -8,6 +9,20 @@ class SessionStore {
   static const _keyTokenSesi = 'bilik_token_sesi';
   static const _keyKodeUjian = 'bilik_kode_ujian';
   static const _keyAnswers = 'bilik_answers_cache';
+  static const _keyDeviceId = 'bilik_device_id';
+
+  /// ID perangkat tetap untuk mengunci satu nama ke satu HP (PRD 5.2/6).
+  /// Dibuat sekali; tetap walau app ditutup.
+  static Future<String> deviceId() async {
+    final sp = await SharedPreferences.getInstance();
+    var id = sp.getString(_keyDeviceId);
+    if (id == null || id.isEmpty) {
+      final acak = Random.secure();
+      id = '${DateTime.now().microsecondsSinceEpoch}-${List.generate(8, (_) => acak.nextInt(16).toRadixString(16)).join()}';
+      await sp.setString(_keyDeviceId, id);
+    }
+    return id;
+  }
 
   static Future<void> saveSession({
     required String pesertaId,

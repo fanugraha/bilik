@@ -1,7 +1,7 @@
 import { Suspense, type ReactNode } from "react";
 import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { NavigasiSamping } from "@/components/navigasi-samping";
+import { NavigasiSamping } from "@/components/layout/navigasi-samping";
 
 async function NavigasiGuru() {
   await connection();
