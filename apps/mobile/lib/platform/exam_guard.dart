@@ -28,6 +28,9 @@ abstract class ExamGuard {
   /// Buka kunci (setelah submit atau selesai).
   Future<void> unlock();
 
+  /// Tandai sedang ujian. Saat aktif, keluar dari app / lepas pinning dilaporkan.
+  Future<void> setActive(bool aktif);
+
   /// Aliran deteksi pelanggaran real-time.
   Stream<ViolationType> get violations;
 
@@ -46,6 +49,8 @@ class _NoopExamGuard implements ExamGuard {
   Future<void> lock() async {}
   @override
   Future<void> unlock() async {}
+  @override
+  Future<void> setActive(bool aktif) async {}
   @override
   Stream<ViolationType> get violations => const Stream.empty();
 }

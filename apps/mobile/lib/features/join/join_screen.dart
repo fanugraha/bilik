@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../models/join.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_siswa.dart';
+import '../../services/session_store.dart';
 
 /// Langkah 1: input kode ujian -> pilih kelas -> pilih nama (PRD 5.2).
 class JoinScreen extends ConsumerStatefulWidget {
@@ -42,7 +43,8 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
       _error = null;
     });
     try {
-      final data = await ApiSiswa.join(kode);
+      final deviceId = await SessionStore.deviceId();
+      final data = await ApiSiswa.join(kode: kode, deviceId: deviceId);
       if (!mounted) return;
       setState(() {
         _data = data;

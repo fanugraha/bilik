@@ -29,8 +29,8 @@ class ApiSiswa {
     }
   }
 
-  static Future<JoinData> join(String kode) async {
-    return JoinData.fromJson(await _call('join', {'kode': kode}));
+  static Future<JoinData> join({required String kode, required String deviceId}) async {
+    return JoinData.fromJson(await _call('join', {'kode': kode, 'device_id': deviceId}));
   }
 
   static Future<HasilPilih> pilih({
@@ -66,5 +66,25 @@ class ApiSiswa {
 
   static Future<void> submit(String token) async {
     await _call('submit', {'token': token});
+  }
+
+  /// Catat pelanggaran. Balikan: total, batas, dan apakah peserta terkunci.
+  static Future<({int jumlah, int batas, bool terkunci})> lapor({
+    required String token,
+    required String jenis,
+    String? keterangan,
+  }) async {
+    final d = await _call('lapor', {'token': token, 'jenis': jenis, 'keterangan': keterangan});
+    return (
+      jumlah: (d['jumlah_pelanggaran'] as num?)?.toInt() ?? 0,
+      batas: (d['batas'] as num?)?.toInt() ?? 3,
+      terkunci: d['terkunci'] == true,
+    );
+  }
+
+  /// Buka kunci dengan kode sekali pakai dari guru.
+  static Future<String> buka({required String token, required String kode}) async {
+    final d = await _call('buka', {'token': token, 'kode': kode});
+    return d['status'] as String? ?? 'mengerjakan';
   }
 }

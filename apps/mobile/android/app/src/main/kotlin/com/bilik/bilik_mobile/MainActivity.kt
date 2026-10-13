@@ -2,6 +2,8 @@ package com.bilik.bilik_mobile
 
 import android.app.ActivityManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -12,16 +14,35 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.bilik/exam_guard"
     private val EVENT_CHANNEL = "com.bilik/exam_guard_events"
     private var eventSink: EventChannel.EventSink? = null
+    private var aktif = false
+    private var dipaku = false
+    private var laporTerakhir = 0L
+    private val handler = Handler(Looper.getMainLooper())
+
+    // Pemantau: setiap 1 dtk cek apakah screen pinning masih aktif.
+    private val pemantau = object : Runnable {
+        override fun run() {
+            if (aktif && dipaku && lockTaskState() != ActivityManager.LOCK_TASK_MODE_LOCKED) {
+                dipaku = false
+                lapor("pinning_released")
+            }
+            if (aktif) handler.postDelayed(this, 1000)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
-                "canPin" -> result.success(canStartLockTask())
+                "canPin" -> result.success(lockTaskState() == ActivityManager.LOCK_TASK_MODE_NONE)
+                "setActive" -> {
+                    aktif = call.argument<Boolean>("aktif") ?: false
+                    result.success(null)
+                }
                 "startLock" -> {
                     startLockMode()
-                    result.success(null)
+                    result.success(dipaku)
                 }
                 "stopLock" -> {
                     stopLockMode()
@@ -36,6 +57,7 @@ class MainActivity : FlutterActivity() {
                 override fun onListen(args: Any?, sink: EventChannel.EventSink?) {
                     eventSink = sink
                 }
+
                 override fun onCancel(args: Any?) {
                     eventSink = null
                 }
@@ -45,31 +67,51 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Blokir screenshot/thumbnail: layar jadi hitam di daftar app terakhir.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
     }
 
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus && isLocked()) {
-            eventSink?.success("window_unfocused")
-        }
+    // Murid keluar dari app saat ujian (tombol Home, app lain, dsb).
+    override fun onPause() {
+        super.onPause()
+        if (aktif) lapor("app_inactive")
     }
 
-    private fun canStartLockTask(): Boolean {
+    // Lapor maksimal sekali per 2 detik agar tidak dobel.
+    private fun lapor(jenis: String) {
+        val sekarang = System.currentTimeMillis()
+        if (sekarang - laporTerakhir < 2000) return
+        laporTerakhir = sekarang
+        eventSink?.success(jenis)
+    }
+
+    private fun lockTaskState(): Int {
         val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        return am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE
+        return am.lockTaskModeState
     }
 
     private fun startLockMode() {
-        startLockTask()
+        try {
+            startLockTask()
+        } catch (_: Exception) {
+            // Perangkat mungkin belum mengizinkan screen pinning.
+        }
+        dipaku = true
+        handler.removeCallbacks(pemantau)
+        handler.postDelayed(pemantau, 1000)
     }
 
     private fun stopLockMode() {
-        stopLockTask()
+        dipaku = false
+        handler.removeCallbacks(pemantau)
+        try {
+            stopLockTask()
+        } catch (_: Exception) {
+        }
     }
 
-    private fun isLocked(): Boolean {
-        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        return am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_LOCKED
+    override fun onDestroy() {
+        handler.removeCallbacks(pemantau)
+        super.onDestroy()
     }
 }

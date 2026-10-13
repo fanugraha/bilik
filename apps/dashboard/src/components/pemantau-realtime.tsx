@@ -6,21 +6,19 @@ import { createClient } from "@/lib/supabase/client";
 
 type PemantauRealtimeProps = {
   ujianId: string;
-  listPesertaId: string[];
 };
 
 type StatusSambungan = "menyambung" | "live" | "terputus";
 
 // Jeda minimal antar refresh, supaya autosave banyak siswa tidak membanjiri server
 const JEDA_REFRESH_MS = 1500;
+// Fallback: apa pun yang terjadi, segarkan sendiri tiap beberapa detik.
+const JEDA_POLL_MS = 5000;
 
-export function PemantauRealtime({ ujianId, listPesertaId }: PemantauRealtimeProps) {
+export function PemantauRealtime({ ujianId }: PemantauRealtimeProps) {
   const router = useRouter();
   const [statusSambungan, setStatusSambungan] = useState<StatusSambungan>("menyambung");
   const timerRefresh = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Gabungkan jadi string agar efek hanya diulang saat daftar peserta benar-benar berubah
-  const kunciPeserta = listPesertaId.join(",");
 
   useEffect(() => {
     const supabase = createClient();
@@ -33,37 +31,30 @@ export function PemantauRealtime({ ujianId, listPesertaId }: PemantauRealtimePro
       }, JEDA_REFRESH_MS);
     }
 
-    let channel = supabase
+    // Filter tabel besar dihilangkan; RLS sudah membatasi guru hanya menerima
+    // baris milik ujiannya. Filter UPDATE yang rapuh (butuh replica identity) dihindari.
+    const channel = supabase
       .channel(`ruang-kontrol-${ujianId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "ujian", filter: `id=eq.${ujianId}` }, jadwalkanRefresh)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "peserta", filter: `ujian_id=eq.${ujianId}` },
-        jadwalkanRefresh,
-      );
-
-    if (kunciPeserta) {
-      const filterPeserta = `peserta_id=in.(${kunciPeserta})`;
-      channel = channel
-        .on("postgres_changes", { event: "*", schema: "public", table: "jawaban", filter: filterPeserta }, jadwalkanRefresh)
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "pelanggaran", filter: filterPeserta },
-          jadwalkanRefresh,
-        );
-    }
+      .on("postgres_changes", { event: "*", schema: "public", table: "peserta", filter: `ujian_id=eq.${ujianId}` }, jadwalkanRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "jawaban" }, jadwalkanRefresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "pelanggaran" }, jadwalkanRefresh);
 
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED") setStatusSambungan("live");
       else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setStatusSambungan("terputus");
     });
 
+    // Jaring pengaman bila realtime tidak jalan: poll berkala.
+    const poll = setInterval(jadwalkanRefresh, JEDA_POLL_MS);
+
     return () => {
+      clearInterval(poll);
       if (timerRefresh.current) clearTimeout(timerRefresh.current);
       timerRefresh.current = null;
       supabase.removeChannel(channel);
     };
-  }, [ujianId, kunciPeserta, router]);
+  }, [ujianId, router]);
 
   let warnaTitik = "bg-kuning";
   let teksStatus = "Menyambung...";

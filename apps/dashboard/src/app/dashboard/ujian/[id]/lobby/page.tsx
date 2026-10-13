@@ -135,7 +135,7 @@ async function RuangKontrol({ ujianId, searchParams }: { ujianId: string; search
         deskripsi={
           <span className="inline-flex flex-wrap items-center gap-3">
             <LencanaStatusUjian status={ujian.status} />
-            {aktif && <PemantauRealtime ujianId={ujianId} listPesertaId={listPesertaId} />}
+            {aktif && <PemantauRealtime ujianId={ujianId} />}
           </span>
         }
         kembali={{ href: "/dashboard/ujian", teks: "Semua ujian" }}

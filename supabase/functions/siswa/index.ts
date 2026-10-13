@@ -29,6 +29,7 @@ function normalKode(v: unknown) {
 
 async function join(db: SupabaseClient, body: Record<string, unknown>) {
   const kode = normalKode(body.kode);
+  const deviceId = String(body.device_id ?? "").trim();
   if (kode.length < 4) return balas({ error: "Kode ujian tidak valid" }, 400);
 
   const { data: ujian, error } = await db
@@ -60,12 +61,18 @@ async function join(db: SupabaseClient, body: Record<string, unknown>) {
     listSiswa = data ?? [];
   }
 
+  // Nama dianggap terpakai hanya bila tokennya milik PERANGKAT LAIN.
+  // Perangkat yang sama boleh memilih namanya lagi (melanjutkan sesi).
   const { data: terpakai } = await db
     .from("peserta")
-    .select("siswa_id")
+    .select("siswa_id, device_id")
     .eq("ujian_id", ujian.id)
     .not("token_sesi", "is", null);
-  const setTerpakai = new Set((terpakai ?? []).map((p) => p.siswa_id as string));
+  const setTerpakai = new Set(
+    (terpakai ?? [])
+      .filter((p) => !(deviceId !== "" && p.device_id === deviceId))
+      .map((p) => p.siswa_id as string),
+  );
 
   const kelas = (relasi ?? []).map((r) => {
     const k = Array.isArray(r.kelas) ? r.kelas[0] : r.kelas;
@@ -293,6 +300,71 @@ async function submit(db: SupabaseClient, body: Record<string, unknown>) {
   return balas({ ok: true });
 }
 
+// Catat pelanggaran, tambah hitungan, kunci bila melewati batas (PRD 6).
+async function lapor(db: SupabaseClient, body: Record<string, unknown>) {
+  const token = String(body.token ?? "").trim();
+  const jenis = String(body.jenis ?? "").trim();
+  const keterangan = body.keterangan == null ? null : String(body.keterangan);
+  if (!jenis) return balas({ error: "Jenis pelanggaran tidak valid" }, 400);
+
+  const sesi = await pesertaDariToken(db, token);
+  if (!sesi) return balas({ ditolak: true }, 404);
+
+  const { error: errorInsert } = await db
+    .from("pelanggaran")
+    .insert({ peserta_id: sesi.peserta.id, jenis, keterangan, waktu_server: new Date().toISOString() });
+  if (errorInsert) throw errorInsert;
+
+  // Jangan tambah hitungan bila sudah selesai.
+  if (sesi.peserta.status === "selesai") {
+    return balas({ ok: true, jumlah_pelanggaran: sesi.peserta.jumlah_pelanggaran, batas: sesi.ujian.batas_pelanggaran, terkunci: false });
+  }
+
+  const batas = sesi.ujian.batas_pelanggaran ?? 3;
+  const jumlah = (sesi.peserta.jumlah_pelanggaran ?? 0) + 1;
+  const terkunci = sesi.peserta.status === "terkunci" || jumlah >= batas;
+
+  const { error: errorUpdate } = await db
+    .from("peserta")
+    .update({ jumlah_pelanggaran: jumlah, status: terkunci ? "terkunci" : sesi.peserta.status })
+    .eq("id", sesi.peserta.id);
+  if (errorUpdate) throw errorUpdate;
+
+  return balas({ ok: true, jumlah_pelanggaran: jumlah, batas, terkunci });
+}
+
+// Buka kunci dengan kode sekali pakai dari guru (PRD 6).
+async function buka(db: SupabaseClient, body: Record<string, unknown>) {
+  const token = String(body.token ?? "").trim();
+  const kode = String(body.kode ?? "").trim().toUpperCase();
+  if (!kode) return balas({ error: "Masukkan kode buka" }, 400);
+
+  const sesi = await pesertaDariToken(db, token);
+  if (!sesi) return balas({ ditolak: true }, 404);
+  if (sesi.peserta.status !== "terkunci") return balas({ ok: true, status: sesi.peserta.status });
+
+  const { data: baris } = await db
+    .from("kode_buka")
+    .select("id, kode, kedaluwarsa_at")
+    .eq("peserta_id", sesi.peserta.id)
+    .eq("dipakai", false)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!baris) return balas({ error: "Belum ada kode buka dari guru" }, 404);
+  if (new Date(baris.kedaluwarsa_at).getTime() < Date.now()) return balas({ error: "Kode buka sudah kedaluwarsa" }, 410);
+  if (String(baris.kode).trim().toUpperCase() !== kode) return balas({ error: "Kode buka salah" }, 400);
+
+  const { error: errorKode } = await db.from("kode_buka").update({ dipakai: true }).eq("id", baris.id);
+  if (errorKode) throw errorKode;
+
+  const { error: errorPeserta } = await db.from("peserta").update({ status: "mengerjakan" }).eq("id", sesi.peserta.id);
+  if (errorPeserta) throw errorPeserta;
+
+  return balas({ ok: true, status: "mengerjakan" });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return balas({ error: "Metode tidak didukung" }, 405);
@@ -322,6 +394,10 @@ Deno.serve(async (req) => {
         return await simpan(db, body);
       case "submit":
         return await submit(db, body);
+      case "lapor":
+        return await lapor(db, body);
+      case "buka":
+        return await buka(db, body);
       default:
         return balas({ error: "Aksi tidak dikenal" }, 400);
     }
