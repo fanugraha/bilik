@@ -83,9 +83,7 @@ flutter_launcher_icons:
 # Splash native (warna/merek saat app dibuka).
 flutter_native_splash:
   color: "#1E1B4B"
-  image: assets/logo/logo.png
   android: true
   ios: true
   android_12:
     color: "#1E1B4B"
-    image: assets/logo/logo.png
