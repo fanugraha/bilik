@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateSoal } from "@/actions/soal";
-import { FormSoal, type NilaiAwalSoal } from "@/components/form-soal";
+import { FormSoal, type NilaiAwalSoal } from "@/components/soal/form-soal";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
 import { KepalaHalaman } from "@/components/ui/kepala-halaman";

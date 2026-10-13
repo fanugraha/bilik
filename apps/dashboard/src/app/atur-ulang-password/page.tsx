@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { aturUlangPassword } from "@/actions/auth";
-import { CangkangAuth } from "@/components/cangkang-auth";
+import { CangkangAuth } from "@/components/auth/cangkang-auth";
 import { Pesan } from "@/components/ui/alert";
 import { Tombol } from "@/components/ui/button";
 import { KotakInput } from "@/components/ui/input";

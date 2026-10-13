@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createUjian } from "@/actions/ujian";
-import { IsianUjian } from "@/components/isian-ujian";
+import { IsianUjian } from "@/components/ujian/isian-ujian";
 import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
 import { KepalaHalaman } from "@/components/ui/kepala-halaman";

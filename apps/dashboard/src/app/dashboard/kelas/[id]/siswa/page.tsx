@@ -10,7 +10,7 @@ import { Kartu } from "@/components/ui/card";
 import { Pesan } from "@/components/ui/alert";
 import { KepalaHalaman } from "@/components/ui/kepala-halaman";
 import { KeadaanKosong } from "@/components/ui/keadaan-kosong";
-import { FormImporSiswa } from "@/components/form-impor-siswa";
+import { FormImporSiswa } from "@/components/siswa/form-impor-siswa";
 
 export const metadata: Metadata = { title: "Siswa" };
 

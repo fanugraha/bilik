@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/supabase_client.dart';
 import '../models/join.dart';
+import '../models/sesi.dart';
 import '../models/soal.dart';
 
 /// Kesalahan yang aman ditampilkan ke siswa.

@@ -1,5 +1,6 @@
 import 'package:bilik_mobile/models/join.dart';
 import 'package:bilik_mobile/models/peserta.dart';
+import 'package:bilik_mobile/models/sesi.dart';
 import 'package:bilik_mobile/models/soal.dart';
 import 'package:flutter_test/flutter_test.dart';
 

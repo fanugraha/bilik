@@ -24,9 +24,9 @@ import { KeadaanKosong } from "@/components/ui/keadaan-kosong";
 import { LencanaStatusPeserta, LencanaStatusUjian, Lencana } from "@/components/ui/lencana";
 import { TautanTombol } from "@/components/ui/tautan-tombol";
 import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
-import { PemantauRealtime } from "@/components/pemantau-realtime";
-import { PapanKode } from "@/components/papan-kode";
-import { HitungMundur } from "@/components/hitung-mundur";
+import { PemantauRealtime } from "@/components/ujian/pemantau-realtime";
+import { PapanKode } from "@/components/ujian/papan-kode";
+import { HitungMundur } from "@/components/ujian/hitung-mundur";
 import { JamLokal } from "@/components/ui/jam-lokal";
 
 export const metadata: Metadata = { title: "Ruang kontrol" };
