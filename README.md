@@ -98,19 +98,19 @@ supabase db push
 ## Status
 
 Fase 0–7 **selesai**; Fase 8 (QA otomatis) selesai — tinggal uji lapangan manual.
-- **Dashboard**: auth guru (daftar/login/lupa password), kelas & siswa (+impor CSV), bank soal (PG/Benar-Salah/Essay, berkelompok), ujian, ruang kontrol realtime, penilaian (rekap per siswa & per soal, histogram, ekspor `.xlsx`).
+- **Dashboard**: auth guru (daftar/login/lupa password + login Google), kelas & siswa (+impor CSV), bank soal (PG/Benar-Salah/Essay, berkelompok), ujian, ruang kontrol realtime, penilaian (rekap per siswa & per soal, histogram, ekspor `.xlsx`). UI/UX dirapikan (beranda, kelas/siswa, bank soal, ujian) dengan alur onboarding yang mengikuti langkah guru.
 - **App siswa**: join (kode → kelas → nama), cek perangkat, lobby, pengerjaan (timer server, autosave offline, ragu-ragu, submit), anti-curang (catat pelanggaran, kunci, kode buka), UI bermerek + splash + ikon.
-- **Backend**: edge function `siswa` (join/pilih/status/soal/simpan/submit/lapor/buka), auto-tutup ujian (pg_cron), trigger pelanggaran, rate limit kode.
+- **Backend**: edge function `siswa` (join/pilih/status/soal/simpan/submit/lapor/buka), auto-tutup ujian (pg_cron), trigger pelanggaran, rate limit kode. Skema database dirapikan: master `mapel`, versi soal, validasi & RLS diperketat, view `ml_jawaban` untuk analisis/ML.
 - **Uji**: `flutter test` (mobile), `npm test` (dashboard), integration end-to-end.
 
-Belum: uji lapangan lintas perangkat (Samsung/Xiaomi/Oppo + iPhone), build/uji iOS, SMTP email, Leaked Password Protection. Detail: `catatan/2026-10-12-progres-lengkap.md`.
+Belum: uji lapangan lintas perangkat (Samsung/Xiaomi/Oppo + iPhone), build/uji iOS, SMTP email, Leaked Password Protection. Detail: `docs/progres.md`.
 
 ## Struktur folder (ringkas)
 
 - `apps/dashboard/src/app` — rute (halaman hanya merakit UI)
 - `apps/dashboard/src/actions` — server actions (mutasi data)
 - `apps/dashboard/src/components/{ui,auth,soal,siswa,ujian,layout}` — komponen UI
-- `apps/dashboard/src/lib` — util & data (`supabase/`, `nilai.ts`, `ruang-kontrol.ts`, `relasi.ts`, `impor-siswa.ts`)
+- `apps/dashboard/src/lib` — util & data (`supabase/`, `nilai.ts`, `ruang-kontrol.ts`, `relasi.ts`, `impor-siswa.ts`, `mapel.ts`, `alur.ts`)
 - `apps/mobile/lib` — `core/ components/ features/ models/ services/ platform/ providers/ utils/`
 - `supabase/functions/siswa` — `index.ts` (router) + `handlers/` + `lib/`
 - `supabase/migrations` — migrasi SQL berurutan
