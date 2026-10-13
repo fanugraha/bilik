@@ -5,9 +5,9 @@ import 'core/router.dart';
 import 'core/theme.dart';
 
 class BilikApp extends ConsumerStatefulWidget {
-  const BilikApp({super.key, this.awal = '/join'});
+  const BilikApp({super.key, this.awal = '/splash'});
 
-  /// Rute awal. Diisi '/lobby' saat ada sesi tersimpan.
+  /// Rute awal. '/splash' akan memilih lanjut ke lobby atau join.
   final String awal;
 
   @override

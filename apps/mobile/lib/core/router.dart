@@ -6,6 +6,7 @@ import '../features/exam/exam_screen.dart';
 import '../features/join/join_screen.dart';
 import '../features/lobby/lobby_screen.dart';
 import '../features/locked/locked_screen.dart';
+import '../features/splash/splash_screen.dart';
 import '../features/submit/receipt_screen.dart';
 
 /// Alur: join -> device check -> lobby -> exam -> (locked) -> receipt.
@@ -14,6 +15,7 @@ import '../features/submit/receipt_screen.dart';
 GoRouter buatRouter(String awal) => GoRouter(
   initialLocation: awal,
   routes: [
+    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
     GoRoute(path: '/join', builder: (_, _) => const JoinScreen()),
     GoRoute(path: '/device', builder: (_, _) => const DeviceCheckScreen()),
     GoRoute(path: '/lobby', builder: (_, _) => const LobbyScreen()),
