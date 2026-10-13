@@ -16,6 +16,7 @@ import '../../platform/exam_guard.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_siswa.dart';
 import '../../services/session_store.dart';
+import '../../utils/format.dart';
 
 /// Langkah 4: pengerjaan ujian (PRD 5.2).
 /// Satu soal per layar, navigasi nomor, timer dari server, autosave, ragu-ragu.
@@ -295,11 +296,6 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     }
   }
 
-  String _formatSisa(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return d.inHours > 0 ? '${d.inHours}:$m:$s' : '$m:$s';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -392,7 +388,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
           Icon(Icons.timer_outlined, size: 16, color: warna),
           const SizedBox(width: 6),
           Text(
-            _formatSisa(_sisa),
+            formatDurasi(_sisa),
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
