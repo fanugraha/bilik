@@ -6,9 +6,8 @@ import '../../components/kartu.dart';
 import '../../components/latar.dart';
 import '../../components/pesan.dart';
 import '../../core/theme.dart';
-import '../../providers/app_providers.dart';
 import '../../services/api_siswa.dart';
-import '../../services/session_store.dart';
+import '../../services/sesi_aktif.dart';
 
 /// Layar terkunci bila pelanggaran melewati batas (PRD 5.2 & 6).
 class LockedScreen extends ConsumerStatefulWidget {
@@ -29,11 +28,7 @@ class _LockedScreenState extends ConsumerState<LockedScreen> {
     super.dispose();
   }
 
-  Future<String?> _token() async {
-    final dariProvider = ref.read(tokenSesiProvider);
-    if (dariProvider != null && dariProvider.isNotEmpty) return dariProvider;
-    return (await SessionStore.getSession())['tokenSesi'];
-  }
+  Future<String?> _token() => ambilTokenSesi(ref);
 
   Future<void> _buka() async {
     final kode = _unlockController.text.trim();

@@ -11,6 +11,7 @@ import '../../core/theme.dart';
 import '../../models/peserta.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_siswa.dart';
+import '../../services/sesi_aktif.dart';
 import '../../services/session_store.dart';
 
 /// Langkah 3: lobby. Menunggu persetujuan guru dan tombol Mulai (PRD 5.2).
@@ -40,11 +41,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     super.dispose();
   }
 
-  Future<String?> _token() async {
-    final dariProvider = ref.read(tokenSesiProvider);
-    if (dariProvider != null && dariProvider.isNotEmpty) return dariProvider;
-    return (await SessionStore.getSession())['tokenSesi'];
-  }
+  Future<String?> _token() => ambilTokenSesi(ref);
 
   Future<void> _cek() async {
     final token = await _token();

@@ -15,6 +15,7 @@ import '../../models/soal.dart';
 import '../../platform/exam_guard.dart';
 import '../../providers/app_providers.dart';
 import '../../services/api_siswa.dart';
+import '../../services/sesi_aktif.dart';
 import '../../services/session_store.dart';
 import '../../utils/format.dart';
 
@@ -77,11 +78,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     super.dispose();
   }
 
-  Future<String?> _ambilToken() async {
-    final dariProvider = ref.read(tokenSesiProvider);
-    if (dariProvider != null && dariProvider.isNotEmpty) return dariProvider;
-    return (await SessionStore.getSession())['tokenSesi'];
-  }
+  Future<String?> _ambilToken() => ambilTokenSesi(ref);
 
   Future<void> _muat() async {
     final token = await _ambilToken();

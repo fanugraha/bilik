@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ambilRekapNilai, rekapPerSoal, sebaranNilai, type BarisRekap } from "@/lib/nilai";
+import { ambilRekapNilai, rataRataNilai, rekapPerSoal, sebaranNilai, type BarisRekap } from "@/lib/nilai";
 import { hitungNilaiOtomatis, tandaiDinilai } from "@/actions/nilai";
 import { Tombol } from "@/components/ui/button";
 import { Kartu } from "@/components/ui/card";
@@ -17,13 +17,6 @@ import { TautanTombol } from "@/components/ui/tautan-tombol";
 export const metadata: Metadata = { title: "Nilai" };
 
 type ParamNilai = { error?: string; sukses?: string; kelas?: string };
-
-function rataRata(listBaris: BarisRekap[]) {
-  if (listBaris.length === 0) return 0;
-  let jumlah = 0;
-  for (const baris of listBaris) jumlah += baris.nilai;
-  return Math.round((jumlah / listBaris.length) * 10) / 10;
-}
 
 function hrefKelas(ujianId: string, namaKelas: string) {
   return namaKelas ? `/dashboard/ujian/${ujianId}/nilai?kelas=${encodeURIComponent(namaKelas)}` : `/dashboard/ujian/${ujianId}/nilai`;
@@ -131,7 +124,7 @@ async function RekapNilai({ ujianId, searchParams }: { ujianId: string; searchPa
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-garis bg-garis sm:grid-cols-4">
             {[
               { teks: "Peserta", nilai: listBarisTampil.length },
-              { teks: "Rata-rata", nilai: rataRata(listBarisTampil) },
+              { teks: "Rata-rata", nilai: rataRataNilai(listBarisTampil) },
               { teks: "Tertinggi", nilai: nilaiTertinggi },
               { teks: "Terendah", nilai: nilaiTerendah },
             ].map((item) => (
@@ -231,7 +224,7 @@ async function RekapNilai({ ujianId, searchParams }: { ujianId: string; searchPa
                       }`}
                     >
                       {namaKelas || "Semua kelas"}
-                      <span className="angka text-xs font-medium opacity-70">rata-rata {rataRata(barisKelas)}</span>
+                      <span className="angka text-xs font-medium opacity-70">rata-rata {rataRataNilai(barisKelas)}</span>
                     </Link>
                   );
                 })}

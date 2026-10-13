@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ambilSatu, type RelasiSatu } from "@/lib/relasi";
 import {
   setujuiPeserta,
   setujuiSemuaPeserta,
@@ -31,8 +32,6 @@ export const metadata: Metadata = { title: "Ruang kontrol" };
 
 type ParamRuangKontrol = { error?: string; sukses?: string; kode_buka?: string; nama?: string };
 
-type RelasiSatu<T> = T | T[] | null;
-
 type PesertaItem = {
   id: string;
   status: string;
@@ -44,10 +43,6 @@ type PesertaItem = {
 };
 
 type ItemRingkasan = { teks: string; jumlah: number; dari?: number; warna: string };
-
-function ambilSatu<T>(relasi: RelasiSatu<T>): T | null {
-  return Array.isArray(relasi) ? (relasi[0] ?? null) : relasi;
-}
 
 // Tombol di atas papan gelap
 const kelasTombolPapanUtama = "bg-white! text-papan! hover:bg-nila-muda!";

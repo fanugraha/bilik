@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ambilSatu, type RelasiSatu } from "./relasi";
 
 export type TipeSoal = "pg" | "essay" | "benar_salah";
 
@@ -102,12 +103,12 @@ export function sebaranNilai(listBaris: BarisRekap[]): SebaranNilai[] {
   return label.map((teks, i) => ({ label: teks, jumlah: jumlah[i] }));
 }
 
-type RelasiSatu<T> = T | T[] | null;
-
-// Supabase bisa mengembalikan relasi sebagai objek atau array, tergantung tipe FK.
-function ambilSatu<T>(relasi: RelasiSatu<T>): T | null {
-  if (Array.isArray(relasi)) return relasi[0] ?? null;
-  return relasi;
+/** Rata-rata nilai (1 desimal). */
+export function rataRataNilai(listBaris: BarisRekap[]): number {
+  if (listBaris.length === 0) return 0;
+  let jumlah = 0;
+  for (const baris of listBaris) jumlah += baris.nilai;
+  return Math.round((jumlah / listBaris.length) * 10) / 10;
 }
 
 export async function ambilRekapNilai(
