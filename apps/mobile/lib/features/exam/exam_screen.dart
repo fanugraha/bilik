@@ -22,7 +22,8 @@ import 'widgets/navigasi_ujian.dart';
 import 'widgets/nomor_soal.dart';
 
 /// Langkah 4: pengerjaan ujian (PRD 5.2).
-/// Satu soal per layar, navigasi nomor, timer dari server, autosave, ragu-ragu.
+/// Satu soal per layar, dikelompokkan per bagian. Siswa hanya bisa maju ke
+/// bagian berikutnya, tidak bisa kembali ke bagian sebelumnya.
 class ExamScreen extends ConsumerStatefulWidget {
   const ExamScreen({super.key});
 
@@ -38,7 +39,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   final _urutanOpsi = <String, List<int>>{};
   final _ctrl = <String, TextEditingController>{};
 
-  List<Soal> _soal = [];
+  List<Section> _sections = [];
+  int _sectionIndex = 0;
   int _index = 0;
   String? _token;
   String? _pesertaId;
@@ -53,11 +55,21 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   bool _menyimpan = false;
   bool _mengirim = false;
   bool _selesai = false;
+  bool _kunciDilepas = false;
+  // Disimpan saat initState agar tetap bisa dipakai di dispose (ref tidak aman setelah unmount).
+  late final ExamGuard _guard;
   String? _error;
+
+  Section get _section => _sections[_sectionIndex];
+  List<Soal> get _soalKini => _section.soal;
+  int get _totalSoal => _sections.fold(0, (a, s) => a + s.soal.length);
+  int get _nomorGlobal => _sections.take(_sectionIndex).fold(0, (a, s) => a + s.soal.length) + _index + 1;
+  bool get _adaBagianBerikut => _sectionIndex < _sections.length - 1;
 
   @override
   void initState() {
     super.initState();
+    _guard = ref.read(examGuardProvider);
     _netSub = Connectivity().onConnectivityChanged.listen((hasil) {
       if (mounted) {
         setState(() => _offline = hasil.contains(ConnectivityResult.none));
@@ -74,6 +86,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     _detak?.cancel();
     _netSub?.cancel();
     _violSub?.cancel();
+    // Jaring pengaman: layar ujian ditutup lewat jalur apa pun, perangkat jangan tetap terkunci.
+    if (!_kunciDilepas) {
+      _guard.setActive(false).then((_) => _guard.unlock()).catchError((_) {});
+    }
     for (final c in _ctrl.values) {
       c.dispose();
     }
@@ -92,15 +108,19 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     try {
       final hasil = await ApiSiswa.soal(token);
       final acak = Random(token.hashCode);
-      final list = List<Soal>.from(hasil.soal);
-      if (hasil.acakSoal) list.shuffle(acak);
-      for (final s in list) {
-        final indeks = List<int>.generate(s.opsi.length, (i) => i);
-        if (hasil.acakOpsi) {
-          indeks.shuffle(Random(token.hashCode ^ s.id.hashCode));
+      final sections = <Section>[];
+      for (final sec in hasil.sections) {
+        final list = List<Soal>.from(sec.soal);
+        if (hasil.acakSoal) list.shuffle(acak);
+        for (final s in list) {
+          final indeks = List<int>.generate(s.opsi.length, (i) => i);
+          if (hasil.acakOpsi) {
+            indeks.shuffle(Random(token.hashCode ^ s.id.hashCode));
+          }
+          _urutanOpsi[s.id] = indeks;
+          if (s.isEssay) _ctrl[s.id] = TextEditingController();
         }
-        _urutanOpsi[s.id] = indeks;
-        if (s.isEssay) _ctrl[s.id] = TextEditingController();
+        sections.add(Section(id: sec.id, urutan: sec.urutan, judul: sec.judul, tipe: sec.tipe, soal: list));
       }
       for (final j in hasil.jawaban) {
         _isi[j.soalId] = j.isi;
@@ -111,7 +131,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
       if (!mounted) return;
       setState(() {
-        _soal = list;
+        _sections = sections.where((s) => s.soal.isNotEmpty).toList();
         _memuat = false;
       });
       ref.read(autosaveServiceProvider).start(token: token);
@@ -146,6 +166,20 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     }
   }
 
+  // Akhiri pengawasan: hentikan autosave & pelaporan, lalu lepas screen pinning / Guided Access.
+  // Wajib dipanggil di setiap jalan keluar dari ujian, kalau tidak HP siswa tetap terkunci.
+  Future<void> _lepasKunci() async {
+    _tick?.cancel();
+    _detak?.cancel();
+    await _violSub?.cancel();
+    ref.read(autosaveServiceProvider).stop();
+    try {
+      await _guard.setActive(false);
+      await _guard.unlock();
+      _kunciDilepas = true;
+    } catch (_) {}
+  }
+
   Future<void> _kunciDanPantau() async {
     final guard = ref.read(examGuardProvider);
     try {
@@ -178,8 +212,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     try {
       final hasil = await ApiSiswa.lapor(token: _token!, jenis: _jenisPelanggaran(t));
       if (hasil.terkunci && mounted && !_mengirim) {
-        _tick?.cancel();
-        _detak?.cancel();
+        await _lepasKunci();
+        if (!mounted) return;
         context.go('/locked');
       }
     } catch (_) {}
@@ -193,16 +227,17 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       if (!mounted || s.ditolak) return;
       final st = s.peserta?.status;
       if (st == 'terkunci') {
-        _tick?.cancel();
-        _detak?.cancel();
+        // Hentikan penguncian saat masuk layar terkunci agar tak mencatat pelanggaran palsu.
+        await _lepasKunci();
+        if (!mounted) return;
         context.go('/locked');
         return;
       }
       if (st == 'selesai') {
+        // Ujian diakhiri guru: sebelumnya kunci tidak dilepas di sini sehingga HP tetap ter-pin.
         _selesai = true;
-        _tick?.cancel();
-        _detak?.cancel();
-        ref.read(autosaveServiceProvider).stop();
+        await _lepasKunci();
+        if (!mounted) return;
         context.go('/receipt');
         return;
       }
@@ -238,8 +273,27 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
   }
 
   void _pilihOpsi(String nilai) {
-    final soal = _soal[_index];
+    final soal = _soalKini[_index];
     _jawab(soal, _isi[soal.id] == nilai ? null : nilai);
+  }
+
+  Future<void> _lanjutBagian() async {
+    final ya = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Lanjut ke bagian berikutnya?'),
+        content: const Text('Bagian sebelumnya tidak bisa dibuka lagi setelah lanjut.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lanjut')),
+        ],
+      ),
+    );
+    if (ya != true || !mounted) return;
+    setState(() {
+      _sectionIndex++;
+      _index = 0;
+    });
   }
 
   Future<void> _kumpulkan({bool paksa = false}) async {
@@ -264,11 +318,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
       await autosave.flush();
       await ApiSiswa.submit(_token!);
       _selesai = true;
-      autosave.stop();
-      try {
-        await ref.read(examGuardProvider).setActive(false);
-        await ref.read(examGuardProvider).unlock();
-      } catch (_) {}
+      await _lepasKunci();
       if (mounted) context.go('/receipt');
     } catch (_) {
       if (!mounted) return;
@@ -310,13 +360,18 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         ),
       );
     }
-    if (_soal.isEmpty) {
+    if (_totalSoal == 0) {
       return const Scaffold(body: Center(child: Text('Belum ada soal untuk ujian ini.')));
     }
 
-    final soal = _soal[_index];
-    final dijawab = _soal.map((s) => (_isi[s.id] ?? '').isNotEmpty).toList();
-    final ragu = _soal.map((s) => _ragu[s.id] ?? false).toList();
+    final soal = _soalKini[_index];
+    final dijawabBagian = _soalKini.map((s) => (_isi[s.id] ?? '').isNotEmpty).toList();
+    final raguBagian = _soalKini.map((s) => _ragu[s.id] ?? false).toList();
+    final terjawabSemua = _sections.expand((s) => s.soal).where((s) => (_isi[s.id] ?? '').isNotEmpty).length;
+    final labelBagian = _sections.length > 1
+        ? 'Bagian ${_sectionIndex + 1} dari ${_sections.length}${_section.judul != null && _section.judul!.isNotEmpty ? ' · ${_section.judul}' : ''}'
+        : null;
+    final soalTerakhirBagian = _index == _soalKini.length - 1;
 
     // Blokir tombol back agar murid tak keluar dari ujian.
     return PopScope(
@@ -326,21 +381,28 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         body: Column(
           children: [
             KepalaUjian(
-              nomorSoal: _index + 1,
-              total: _soal.length,
+              nomorSoal: _nomorGlobal,
+              total: _totalSoal,
               sisa: _sisa,
-              terjawab: dijawab.where((d) => d).length,
+              terjawab: terjawabSemua,
             ),
             BilahStatusUjian(offline: _offline, menyimpan: _menyimpan),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
+                  if (labelBagian != null) ...[
+                    Text(
+                      labelBagian,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: BilikWarna.nila),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   NomorSoal(
-                    jumlah: _soal.length,
+                    jumlah: _soalKini.length,
                     index: _index,
-                    dijawab: dijawab,
-                    ragu: ragu,
+                    dijawab: dijawabBagian,
+                    ragu: raguBagian,
                     onPilih: (i) => setState(() => _index = i),
                   ),
                   const SizedBox(height: 16),
@@ -359,12 +421,15 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
             NavigasiUjian(
               sudahRagu: _ragu[soal.id] ?? false,
               index: _index,
-              total: _soal.length,
+              total: _soalKini.length,
               mengirim: _mengirim,
               onToggleRagu: () => _toggleRagu(soal),
               onPrev: _index > 0 ? () => setState(() => _index--) : null,
-              onNext: _index < _soal.length - 1 ? () => setState(() => _index++) : null,
+              onNext: !soalTerakhirBagian
+                  ? () => setState(() => _index++)
+                  : (_adaBagianBerikut ? _lanjutBagian : null),
               onKumpulkan: () => _kumpulkan(),
+              nextLabel: soalTerakhirBagian && _adaBagianBerikut ? 'Bagian berikutnya' : null,
             ),
           ],
         ),

@@ -35,7 +35,13 @@ class _DeviceCheckScreenState extends ConsumerState<DeviceCheckScreen> {
 
   Future<void> _check() async {
     setState(() => _checking = true);
-    final ok = await ref.read(examGuardProvider).checkPrerequisites();
+    bool ok = false;
+    try {
+      ok = await ref.read(examGuardProvider).checkPrerequisites();
+    } catch (_) {
+      // Kanal platform gagal (mis. perangkat tak dukung): jangan sampai macet.
+      ok = false;
+    }
     if (mounted) {
       setState(() {
         _isReady = ok;
@@ -164,15 +170,22 @@ class _DeviceCheckScreenState extends ConsumerState<DeviceCheckScreen> {
                       const Divider(height: 20),
                       _barisCek('Blokir screenshot', Platform.isIOS ? 'Terdeteksi & layar diblur' : 'FLAG_SECURE aktif', true),
                       const SizedBox(height: 20),
+                      if (!_isReady && !_checking) ...[
+                        const Pesan(
+                          'Penguncian layar belum terdeteksi. Anda tetap bisa lanjut, tapi sebaiknya aktifkan Screen Pinning / Guided Access.',
+                          jenis: JenisPesan.peringatan,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (_error != null) ...[
                         Pesan(_error!, jenis: JenisPesan.error),
                         const SizedBox(height: 12),
                       ],
                       FilledButton(
-                        onPressed: (_isReady && !_mendaftar) ? _masukLobby : null,
+                        onPressed: _mendaftar ? null : _masukLobby,
                         child: _mendaftar
                             ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Siap, masuk lobby'),
+                            : Text(_isReady ? 'Siap, masuk lobby' : 'Lanjut tanpa penguncian'),
                       ),
                       const SizedBox(height: 8),
                       OutlinedButton(

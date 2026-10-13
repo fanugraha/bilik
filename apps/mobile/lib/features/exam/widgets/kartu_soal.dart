@@ -61,10 +61,17 @@ class KartuSoal extends StatelessWidget {
 
   Widget _jawaban() {
     if (soal.isPg) {
+      // Label tetap A, B, C, ... berurutan; yang diacak hanya isi pilihannya.
+      // urutanOpsi[posisi] = indeks asli opsi yang tampil di baris posisi.
       return Column(
         children: [
-          for (final i in urutanOpsi)
-            _opsiTile(huruf: hurufOpsi(i), teks: soal.opsi[i], dipilih: isi == hurufOpsi(i)),
+          for (var posisi = 0; posisi < urutanOpsi.length; posisi++)
+            _opsiTile(
+              huruf: hurufOpsi(posisi),
+              teks: soal.opsi[urutanOpsi[posisi]],
+              dipilih: isi == hurufOpsi(urutanOpsi[posisi]),
+              nilai: hurufOpsi(urutanOpsi[posisi]),
+            ),
         ],
       );
     }

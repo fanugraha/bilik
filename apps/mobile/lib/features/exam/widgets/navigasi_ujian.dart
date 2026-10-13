@@ -14,6 +14,7 @@ class NavigasiUjian extends StatelessWidget {
     required this.onPrev,
     required this.onNext,
     required this.onKumpulkan,
+    this.nextLabel,
   });
 
   final bool sudahRagu;
@@ -24,10 +25,13 @@ class NavigasiUjian extends StatelessWidget {
   final VoidCallback? onPrev;
   final VoidCallback? onNext;
   final VoidCallback onKumpulkan;
+  // Jika diisi, tombol di soal terakhir bagian ini jadi "lanjut bagian", bukan "Kumpulkan".
+  final String? nextLabel;
 
   @override
   Widget build(BuildContext context) {
     final terakhir = index >= total - 1;
+    final lanjutBagian = terakhir && nextLabel != null;
     return Container(
       decoration: const BoxDecoration(
         color: BilikWarna.permukaan,
@@ -66,17 +70,23 @@ class NavigasiUjian extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: terakhir
+                    child: lanjutBagian
                         ? FilledButton.icon(
-                            onPressed: mengirim ? null : onKumpulkan,
-                            icon: const Icon(Icons.check, size: 20),
-                            label: Text(mengirim ? 'Mengirim…' : 'Kumpulkan'),
-                          )
-                        : FilledButton.icon(
                             onPressed: onNext,
                             icon: const Icon(Icons.chevron_right, size: 20),
-                            label: const Text('Berikutnya'),
-                          ),
+                            label: Text(nextLabel!),
+                          )
+                        : terakhir
+                            ? FilledButton.icon(
+                                onPressed: mengirim ? null : onKumpulkan,
+                                icon: const Icon(Icons.check, size: 20),
+                                label: Text(mengirim ? 'Mengirim…' : 'Kumpulkan'),
+                              )
+                            : FilledButton.icon(
+                                onPressed: onNext,
+                                icon: const Icon(Icons.chevron_right, size: 20),
+                                label: const Text('Berikutnya'),
+                              ),
                   ),
                 ],
               ),

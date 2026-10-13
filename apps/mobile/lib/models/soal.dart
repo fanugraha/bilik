@@ -43,9 +43,30 @@ class JawabanTersimpan {
       );
 }
 
-/// Hasil aksi `soal`: daftar soal + jawaban tersimpan + info waktu.
-class HasilSoal {
+/// Bagian ujian: satu tipe soal, punya urutan, bisa diberi judul.
+class Section {
+  final String id;
+  final int urutan;
+  final String? judul;
+  final String tipe;
   final List<Soal> soal;
+
+  const Section({required this.id, required this.urutan, this.judul, required this.tipe, required this.soal});
+
+  factory Section.fromJson(Map<String, dynamic> json) => Section(
+        id: json['id'] as String? ?? '',
+        urutan: (json['urutan'] as num?)?.toInt() ?? 0,
+        judul: json['judul'] as String?,
+        tipe: json['tipe'] as String? ?? '',
+        soal: (json['soal'] as List<dynamic>? ?? [])
+            .map((e) => Soal.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList(),
+      );
+}
+
+/// Hasil aksi `soal`: daftar bagian + jawaban tersimpan + info waktu.
+class HasilSoal {
+  final List<Section> sections;
   final List<JawabanTersimpan> jawaban;
   final String statusPeserta;
   final DateTime? selesaiAt;
@@ -54,7 +75,7 @@ class HasilSoal {
   final String judul;
 
   const HasilSoal({
-    required this.soal,
+    required this.sections,
     required this.jawaban,
     required this.statusPeserta,
     this.selesaiAt,
@@ -63,13 +84,28 @@ class HasilSoal {
     required this.judul,
   });
 
+  /// Semua soal lintas bagian (dipakai untuk hitung progres).
+  List<Soal> get soal => [for (final s in sections) ...s.soal];
+
   factory HasilSoal.fromJson(Map<String, dynamic> json) {
     final peserta = Map<String, dynamic>.from(json['peserta'] as Map? ?? {});
     final ujian = Map<String, dynamic>.from(json['ujian'] as Map? ?? {});
-    return HasilSoal(
-      soal: (json['soal'] as List<dynamic>? ?? [])
+
+    // Utamakan `sections`; kalau tidak ada (server lama), bungkus `soal` jadi satu bagian.
+    List<Section> sections;
+    if (json['sections'] is List) {
+      sections = (json['sections'] as List<dynamic>)
+          .map((e) => Section.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } else {
+      final soal = (json['soal'] as List<dynamic>? ?? [])
           .map((e) => Soal.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
+          .toList();
+      sections = [Section(id: 'all', urutan: 1, tipe: '', soal: soal)];
+    }
+
+    return HasilSoal(
+      sections: sections,
       jawaban: (json['jawaban'] as List<dynamic>? ?? [])
           .map((e) => JawabanTersimpan.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
