@@ -1,6 +1,7 @@
 package com.bilik.bilik_mobile
 
 import android.app.ActivityManager
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -75,6 +76,12 @@ class MainActivity : FlutterActivity() {
     override fun onPause() {
         super.onPause()
         if (aktif) lapor("app_inactive")
+    }
+
+    // Layar dipecah (split-screen) saat ujian.
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+        if (aktif && isInMultiWindowMode) lapor("multi_window")
     }
 
     // Lapor maksimal sekali per 2 detik agar tidak dobel.
