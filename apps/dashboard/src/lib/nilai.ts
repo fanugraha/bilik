@@ -1,7 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ambilSatu, type RelasiSatu } from "./relasi";
 
-export type TipeSoal = "pg" | "essay" | "benar_salah";
+export type TipeSoal = "pg" | "essay" | "benar_salah" | "angket";
+
+// Hanya PG yang dinilai otomatis (server). Tipe lain dinilai manual oleh guru.
+export function soalOtomatis(tipe: TipeSoal): boolean {
+  return tipe === "pg";
+}
+
+// Skor maksimal tiap soal = bobotnya (termasuk angket, karena dinilai manual).
+export function skorMaksSoal(soal: { tipe: TipeSoal; bobot: number }): number {
+  return soal.bobot;
+}
 
 export type SoalUjian = {
   soalId: string;
@@ -25,20 +35,25 @@ export type BarisRekap = {
   namaKelas: string;
   status: string;
   jumlahPelanggaran: number;
-  skorOtomatis: number;
-  skorEssay: number;
-  essayBelumDikoreksi: number;
+  skorOtomatis: number; // PG saja
+  skorManual: number; // benar_salah, essay, angket
+  belumDinilai: number; // jawaban manual yang belum diberi skor
   totalSkor: number;
   nilai: number;
   listJawaban: JawabanPeserta[];
 };
 
 export type RekapNilai = {
-  ujian: { id: string; judul: string; mapel: string | null; status: string };
+  ujian: { id: string; judul: string; mapel: string | null; status: string; kkm: number };
   listSoal: SoalUjian[];
   skorMaksimal: number;
   listBaris: BarisRekap[];
 };
+
+/** Lulus bila nilai (0-100) mencapai KKM. */
+export function lulus(nilai: number, kkm: number): boolean {
+  return nilai >= kkm;
+}
 
 export type StatSoal = {
   soal: SoalUjian;
@@ -64,7 +79,8 @@ export function rekapPerSoal(listSoal: SoalUjian[], listBaris: BarisRekap[]): St
       const jawaban = baris.listJawaban.find((item) => item.soalId === soal.soalId);
       const kosongkan = !jawaban || jawaban.isi === null || jawaban.isi === "";
 
-      if (soal.tipe === "essay") {
+      if (soal.tipe !== "pg") {
+        // Manual: rata-rata skor yang sudah dinilai; belum = belum diberi skor.
         if (kosongkan) kosong++;
         else if (jawaban!.skor === null) belumDikoreksi++;
         else {
@@ -85,7 +101,7 @@ export function rekapPerSoal(listSoal: SoalUjian[], listBaris: BarisRekap[]): St
 
     const dijawab = benar + salah + jumlahDinilai + belumDikoreksi;
     const rataRataSkor = jumlahDinilai > 0 ? Math.round((jumlahSkor / jumlahDinilai) * 100) / 100 : null;
-    const persenBenar = soal.tipe === "essay" ? null : dijawab > 0 ? Math.round((benar / dijawab) * 1000) / 10 : 0;
+    const persenBenar = soal.tipe !== "pg" ? null : dijawab > 0 ? Math.round((benar / dijawab) * 1000) / 10 : 0;
 
     return { soal, benar, salah, kosong, belumDikoreksi, rataRataSkor, persenBenar };
   });
@@ -119,7 +135,7 @@ export async function ambilRekapNilai(
 ): Promise<RekapNilai | null> {
   const { data: ujian } = await supabase
     .from("ujian")
-    .select("id, judul, mapel, status")
+    .select("id, judul, mapel, status, kkm")
     .eq("id", ujianId)
     .eq("guru_id", guruId)
     .single();
@@ -144,7 +160,7 @@ export async function ambilRekapNilai(
   });
 
   let skorMaksimal = 0;
-  for (const soal of listSoal) skorMaksimal += soal.bobot;
+  for (const soal of listSoal) skorMaksimal += skorMaksSoal(soal);
 
   const { data: dataPeserta } = await supabase
     .from("peserta")
@@ -174,19 +190,19 @@ export async function ambilRekapNilai(
       }));
 
     let skorOtomatis = 0;
-    let skorEssay = 0;
-    let essayBelumDikoreksi = 0;
+    let skorManual = 0;
+    let belumDinilai = 0;
     for (const jawaban of listJawaban) {
       const tipe = tipePerSoal.get(jawaban.soalId);
-      if (tipe === "essay") {
-        if (jawaban.skor === null) essayBelumDikoreksi++;
-        else skorEssay += jawaban.skor;
-      } else if (tipe) {
+      if (tipe === "pg") {
         skorOtomatis += jawaban.skor ?? 0;
+      } else if (tipe) {
+        if (jawaban.skor === null) belumDinilai++;
+        else skorManual += jawaban.skor;
       }
     }
 
-    const totalSkor = skorOtomatis + skorEssay;
+    const totalSkor = skorOtomatis + skorManual;
     const nilai = skorMaksimal > 0 ? Math.round((totalSkor / skorMaksimal) * 1000) / 10 : 0;
 
     return {
@@ -197,8 +213,8 @@ export async function ambilRekapNilai(
       status: peserta.status,
       jumlahPelanggaran: peserta.jumlah_pelanggaran,
       skorOtomatis,
-      skorEssay,
-      essayBelumDikoreksi,
+      skorManual,
+      belumDinilai,
       totalSkor,
       nilai,
       listJawaban,

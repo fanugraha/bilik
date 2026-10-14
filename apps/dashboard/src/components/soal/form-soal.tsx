@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Tombol } from "@/components/ui/button";
 import { TautanTombol } from "@/components/ui/tautan-tombol";
 
-type TipeSoal = "pg" | "benar_salah" | "essay";
+type TipeSoal = "pg" | "benar_salah" | "angket" | "essay";
 
 export type NilaiAwalSoal = {
   tipe: TipeSoal;
@@ -36,16 +36,26 @@ type FormSoalProps = {
 const pilihanTipe: { nilai: TipeSoal; teks: string; keterangan: string }[] = [
   { nilai: "pg", teks: "Pilihan ganda", keterangan: "Dinilai otomatis" },
   { nilai: "benar_salah", teks: "Benar/Salah", keterangan: "Dinilai otomatis" },
+  { nilai: "angket", teks: "Angket", keterangan: "Skala 1-4" },
   { nilai: "essay", teks: "Essay", keterangan: "Dikoreksi guru" },
 ];
 
 const hurufOpsi = ["A", "B", "C", "D", "E"];
+
+// Pilihan tetap angket: siswa memilih satu, skornya nilai 1-4 (tanpa kunci).
+const pilihanAngket = [
+  { nilai: "4", teks: "Sangat setuju" },
+  { nilai: "3", teks: "Setuju" },
+  { nilai: "2", teks: "Tidak setuju" },
+  { nilai: "1", teks: "Sangat tidak setuju" },
+];
 
 // Form soal untuk halaman Buat dan Ubah. Hanya isian yang relevan dengan tipe soal yang tampil.
 export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank, bankTerpilih, kembali, bolehTulisLagi = false }: FormSoalProps) {
   const [tipe, setTipe] = useState<TipeSoal>(nilaiAwal?.tipe ?? "pg");
   const bankAwal = nilaiAwal?.bank_soal_id ?? bankTerpilih ?? daftarBank[0]?.id ?? "";
   const hrefBatal = kembali ?? (bankAwal ? `/dashboard/soal/bank/${bankAwal}` : "/dashboard/soal");
+  const labelTeks = tipe === "benar_salah" || tipe === "angket" ? "Pernyataan" : "Pertanyaan";
 
   return (
     <form action={aksi} className="space-y-6">
@@ -54,7 +64,7 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank, bank
 
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-tinta">Tipe soal</legend>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {pilihanTipe.map((pilihan) => (
             <label
               key={pilihan.nilai}
@@ -93,7 +103,7 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank, bank
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="teks" className="text-sm font-medium text-tinta">
-            {tipe === "benar_salah" ? "Pernyataan" : "Pertanyaan"}
+            {labelTeks}
           </label>
           <textarea
             id="teks"
@@ -101,29 +111,43 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank, bank
             required
             rows={4}
             defaultValue={nilaiAwal?.teks}
-            placeholder={tipe === "benar_salah" ? "Contoh: Air mendidih pada suhu 100°C di permukaan laut." : "Tulis pertanyaan di sini"}
+            placeholder={
+              tipe === "benar_salah"
+                ? "Contoh: Air mendidih pada suhu 100°C di permukaan laut."
+                : tipe === "angket"
+                  ? "Contoh: Saya memahami materi ini dengan baik."
+                  : "Tulis pertanyaan di sini"
+            }
             className="bidang resize-y"
           />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="bobot" className="text-sm font-medium text-tinta">
-            Bobot
-          </label>
-          <input
-            id="bobot"
-            name="bobot"
-            type="number"
-            min="0.5"
-            step="0.5"
-            required
-            defaultValue={nilaiAwal?.bobot ?? 1}
-            aria-describedby="bobot-bantuan"
-            className="bidang angka"
-          />
-          <p id="bobot-bantuan" className="text-xs text-tinta-2">
-            Skor jika benar.
-          </p>
-        </div>
+        {tipe === "angket" ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-tinta">Skor</span>
+            <p className="rounded-lg border border-garis bg-kertas px-3 py-2 text-sm text-tinta-2">1 sampai 4</p>
+            <p className="text-xs text-tinta-2">Dari pilihan siswa.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="bobot" className="text-sm font-medium text-tinta">
+              Bobot
+            </label>
+            <input
+              id="bobot"
+              name="bobot"
+              type="number"
+              min="0.5"
+              step="0.5"
+              required
+              defaultValue={nilaiAwal?.bobot ?? 1}
+              aria-describedby="bobot-bantuan"
+              className="bidang angka"
+            />
+            <p id="bobot-bantuan" className="text-xs text-tinta-2">
+              Skor jika benar.
+            </p>
+          </div>
+        )}
       </div>
 
       {tipe === "pg" && (
@@ -189,6 +213,19 @@ export function FormSoal({ aksi, teksSimpan, idSoal, nilaiAwal, daftarBank, bank
             <textarea id="penjelasan" name="penjelasan" rows={2} defaultValue={nilaiAwal?.penjelasan ?? ""} className="bidang" />
           </div>
         </div>
+      )}
+
+      {tipe === "angket" && (
+        <fieldset className="space-y-2">
+          <legend className="mb-1 text-sm font-medium text-tinta">Pilihan jawaban</legend>
+          <p className="mb-2 text-xs text-tinta-2">Siswa memilih satu tingkat persetujuan. Skor = nilai pilihan (tanpa kunci).</p>
+          {pilihanAngket.map((pilihan) => (
+            <div key={pilihan.nilai} className="flex items-center gap-3 rounded-lg border border-garis px-4 py-2 text-sm text-tinta-2">
+              <span className="angka w-6 shrink-0 text-center font-semibold text-tinta">{pilihan.nilai}</span>
+              <span>{pilihan.teks}</span>
+            </div>
+          ))}
+        </fieldset>
       )}
 
       {tipe === "essay" && (

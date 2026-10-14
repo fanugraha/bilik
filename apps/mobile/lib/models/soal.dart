@@ -2,7 +2,7 @@
 /// server hanya mengirim teks + opsi, penilaian di server.
 class Soal {
   final String id;
-  final String tipe; // 'pg' | 'benar_salah' | 'essay'
+  final String tipe; // 'pg' | 'benar_salah' | 'angket' | 'essay'
   final String teks;
   final List<String> opsi;
   final num bobot;
@@ -17,6 +17,7 @@ class Soal {
 
   bool get isPg => tipe == 'pg';
   bool get isBenarSalah => tipe == 'benar_salah';
+  bool get isAngket => tipe == 'angket';
   bool get isEssay => tipe == 'essay';
 
   factory Soal.fromJson(Map<String, dynamic> json) => Soal(

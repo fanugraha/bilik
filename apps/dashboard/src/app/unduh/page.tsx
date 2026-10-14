@@ -29,6 +29,7 @@ export default function UnduhPage() {
     >
       <div className="flex flex-col gap-6">
         <TautanTombol href={apkUrl} teks="Unduh APK (Android)" ikon="unduh" jenis="utama" className="w-full" unduh />
+        <TautanTombol href="/ujian" teks="Kerjakan lewat web (tanpa pasang)" ikon="ujian" jenis="kedua" className="w-full" />
 
         <ol className="space-y-2.5 text-sm text-tinta-2">
           {langkah.map((teks, indeks) => (

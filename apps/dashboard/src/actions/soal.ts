@@ -68,6 +68,10 @@ function susunIsianSoal(formData: FormData): { isian: Record<string, unknown> } 
     const penjelasan = rapikanTeks(formData.get("penjelasan")) || null;
     return { isian: { tipe: "benar_salah", teks, jawaban_benar: jawabanBenar, penjelasan, bobot, opsi: [], kunci: null, pedoman: null } };
   }
+  if (tipe === "angket") {
+    // Skala tetap 1-4; skor dari pilihan siswa, jadi bobot tidak dipakai.
+    return { isian: { tipe: "angket", teks, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null, pedoman: null, bobot: 1 } };
+  }
   const pedoman = rapikanTeks(formData.get("pedoman")) || null;
   return { isian: { tipe: "essay", teks, pedoman, bobot, opsi: [], kunci: null, jawaban_benar: null, penjelasan: null } };
 }

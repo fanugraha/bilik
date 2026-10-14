@@ -6,6 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { mapelDariForm } from "@/lib/mapel";
 import { NAMA_TIPE, urutkanTipe } from "@/lib/bagian-ujian";
 
+// KKM (0-100); di luar rentang atau kosong jatuh ke bawaan 70
+function bacaKkm(formData: FormData): number {
+  const nilai = parseInt(formData.get("kkm") as string);
+  if (Number.isNaN(nilai)) return 70;
+  return Math.min(100, Math.max(0, nilai));
+}
+
 // Hanya kelas milik guru yang boleh jadi peserta ujian
 async function saringKelasMilikGuru(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -29,6 +36,7 @@ export async function createUjian(formData: FormData) {
   const judul = (formData.get("judul") as string)?.trim();
   const { mapel_id } = await mapelDariForm(supabase, formData);
   const durasi = parseInt(formData.get("durasi") as string);
+  const kkm = bacaKkm(formData);
   const bankAsal = ((formData.get("bank") as string) ?? "").replace(/[^0-9a-f-]/gi, "");
   const halamanBuat = (pesan: string) =>
     `/dashboard/ujian/buat?${new URLSearchParams({ ...(bankAsal ? { bank: bankAsal } : {}), error: pesan }).toString()}`;
@@ -43,6 +51,7 @@ export async function createUjian(formData: FormData) {
       judul,
       mapel_id,
       durasi,
+      kkm,
       acak_soal: false,
       acak_opsi: false,
       batas_pelanggaran: 3,
@@ -71,13 +80,14 @@ export async function simpanInfoUjian(formData: FormData) {
   const judul = (formData.get("judul") as string)?.trim();
   const { mapel_id } = await mapelDariForm(supabase, formData);
   const durasi = parseInt(formData.get("durasi") as string);
+  const kkm = bacaKkm(formData);
 
   if (!judul) redirect(`/dashboard/ujian/${id}/ubah?error=` + encodeURIComponent("Judul wajib diisi"));
   if (!durasi || durasi < 1) redirect(`/dashboard/ujian/${id}/ubah?error=` + encodeURIComponent("Durasi minimal 1 menit"));
 
   await pastikanUjianDraft(supabase, id, user.id);
 
-  const { error } = await supabase.from("ujian").update({ judul, mapel_id, durasi }).eq("id", id).eq("guru_id", user.id);
+  const { error } = await supabase.from("ujian").update({ judul, mapel_id, durasi, kkm }).eq("id", id).eq("guru_id", user.id);
 
   if (error) redirect(`/dashboard/ujian/${id}/ubah?error=` + encodeURIComponent(error.message));
 
@@ -166,68 +176,79 @@ function halamanSoalUjian(ujianId: string, pesan?: { error?: string; sukses?: st
 
 type KlienSupabase = Awaited<ReturnType<typeof createClient>>;
 
-// Masukkan soal ke bagian sesuai tipenya; bagian yang belum ada dibuat otomatis
-// (urutan baku PG -> Benar/Salah -> Essay). Mengembalikan jumlah soal yang masuk.
+export type ModeBagian = "gabung" | "pisah";
+
+// Nama bank soal (untuk judul bagian saat mode 'pisah').
+async function namaBankSoal(supabase: KlienSupabase, bankId: string): Promise<string | null> {
+  if (!bankId) return null;
+  const { data } = await supabase.from("bank_soal").select("nama").eq("id", bankId).maybeSingle();
+  return data?.nama ?? null;
+}
+
+// Masukkan soal ke bagian. Mode 'gabung': satu bagian per tipe (mis. "Angket").
+// Mode 'pisah': satu bagian per bank+tipe, judulnya "Tipe Bank" (mis. "Angket Peredaran Darah").
+// Mengembalikan jumlah soal yang masuk.
 async function masukkanSoalKeBagian(
   supabase: KlienSupabase,
   ujianId: string,
   listSoal: { id: string; tipe: string; bobot: number }[],
+  opsi: { mode: ModeBagian; namaBank?: string | null },
 ): Promise<{ jumlah: number; error?: string }> {
-  const { data: sections } = await supabase.from("ujian_section").select("id, tipe, urutan").eq("ujian_id", ujianId);
+  const { data: sections } = await supabase.from("ujian_section").select("id, tipe, urutan, judul").eq("ujian_id", ujianId);
   const daftarSection = sections ?? [];
   let urutanBagianTerakhir = daftarSection.reduce((maks, s) => Math.max(maks, s.urutan), 0);
 
   let jumlah = 0;
   for (const tipe of urutkanTipe(listSoal.map((soal) => soal.tipe))) {
     const soalTipe = listSoal.filter((soal) => soal.tipe === tipe);
+    const judul = opsi.mode === "pisah" && opsi.namaBank ? `${NAMA_TIPE[tipe]} ${opsi.namaBank}` : NAMA_TIPE[tipe];
 
-    let section = daftarSection.find((s) => s.tipe === tipe);
+    let section = daftarSection.find((s) => s.tipe === tipe && (s.judul ?? NAMA_TIPE[tipe]) === judul);
     if (!section) {
       const { data: dibuat, error } = await supabase
         .from("ujian_section")
-        .insert({ ujian_id: ujianId, urutan: ++urutanBagianTerakhir, judul: NAMA_TIPE[tipe], tipe })
-        .select("id, tipe, urutan")
+        .insert({ ujian_id: ujianId, urutan: ++urutanBagianTerakhir, judul, tipe })
+        .select("id, tipe, urutan, judul")
         .single();
       if (error || !dibuat) return { jumlah, error: error?.message ?? "Bagian gagal dibuat" };
       section = dibuat;
       daftarSection.push(dibuat);
     }
 
-    const { data: terakhir } = await supabase
-      .from("ujian_soal")
-      .select("urutan")
-      .eq("section_id", section.id)
-      .order("urutan", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    let urutan = (terakhir?.urutan ?? 0) + 1;
+    // Soal yang sudah ada di bagian ini dibiarkan (agar klik ulang tidak menggandakan).
+    // Soal yang masih di bagian lain dipindah ke bagian ini (mode gabung/pisah bisa diterapkan ulang).
+    const { data: isiBagian } = await supabase.from("ujian_soal").select("soal_id, urutan").eq("section_id", section.id);
+    const idDiBagian = new Set((isiBagian ?? []).map((baris) => baris.soal_id));
+    let urutan = (isiBagian ?? []).reduce((maks, baris) => Math.max(maks, baris.urutan), 0);
 
-    const { error } = await supabase.from("ujian_soal").insert(
-      soalTipe.map((soal) => ({ ujian_id: ujianId, section_id: section.id, soal_id: soal.id, urutan: urutan++, bobot: soal.bobot })),
-    );
-    if (error) return { jumlah, error: error.message };
-    jumlah += soalTipe.length;
+    const baris = soalTipe
+      .filter((soal) => !idDiBagian.has(soal.id))
+      .map((soal) => ({ ujian_id: ujianId, section_id: section.id, soal_id: soal.id, urutan: ++urutan, bobot: soal.bobot }));
+
+    if (baris.length > 0) {
+      const { error } = await supabase.from("ujian_soal").upsert(baris, { onConflict: "ujian_id,soal_id" });
+      if (error) return { jumlah, error: error.message };
+      jumlah += baris.length;
+    }
   }
   return { jumlah };
 }
 
-// Soal milik guru yang belum ada di ujian ini, dari daftar id atau dari bank + tipe
-async function soalBaruUntukUjian(
+// Soal milik guru yang cocok dengan saringan (dari daftar id atau bank + tipe).
+// Tidak menyaring soal yang sudah ada di ujian: penyusunan bagian perlu menyentuh
+// soal yang sudah masuk agar mode gabung/pisah bisa diterapkan ulang.
+async function soalUntukUjian(
   supabase: KlienSupabase,
-  ujianId: string,
   guruId: string,
   saring: { soalIds?: string[]; bankId?: string; listTipe?: string[] },
 ) {
-  const { data: sudahAda } = await supabase.from("ujian_soal").select("soal_id").eq("ujian_id", ujianId);
-  const idSudahAda = new Set((sudahAda ?? []).map((baris) => baris.soal_id));
-
   let query = supabase.from("soal").select("id, tipe, bobot").eq("guru_id", guruId).order("created_at", { ascending: true });
   if (saring.soalIds) query = query.in("id", saring.soalIds);
   if (saring.bankId) query = query.eq("bank_soal_id", saring.bankId);
   if (saring.listTipe) query = query.in("tipe", saring.listTipe);
   const { data } = await query;
 
-  return (data ?? []).filter((soal) => !idSudahAda.has(soal.id)).map((soal) => ({ ...soal, bobot: Number(soal.bobot) }));
+  return (data ?? []).map((soal) => ({ ...soal, bobot: Number(soal.bobot) }));
 }
 
 // Cara utama: pilih bank lalu tipe; semua soal tipe itu dari bank masuk ke bagiannya
@@ -241,19 +262,22 @@ export async function ambilSoalPerTipe(formData: FormData) {
   const ujianId = formData.get("ujian_id") as string;
   const bank = (formData.get("bank") as string) ?? "";
   const listTipe = urutkanTipe(formData.getAll("tipe").map(String));
+  const mode: ModeBagian = formData.get("mode") === "pisah" ? "pisah" : "gabung";
 
   await pastikanUjianDraft(supabase, ujianId, user.id);
   if (!bank) redirect(halamanSoalUjian(ujianId, { error: "Pilih bank soal dulu" }));
   if (listTipe.length === 0) redirect(halamanSoalUjian(ujianId, { bank, error: "Centang minimal satu tipe soal" }));
 
-  const listSoal = await soalBaruUntukUjian(supabase, ujianId, user.id, { bankId: bank, listTipe });
-  if (listSoal.length === 0) redirect(halamanSoalUjian(ujianId, { bank, error: "Semua soal tipe itu dari bank ini sudah ada di ujian" }));
+  const listSoal = await soalUntukUjian(supabase, user.id, { bankId: bank, listTipe });
+  if (listSoal.length === 0) redirect(halamanSoalUjian(ujianId, { bank, error: "Tidak ada soal tipe itu di bank ini" }));
 
-  const { jumlah, error } = await masukkanSoalKeBagian(supabase, ujianId, listSoal);
+  const namaBank = await namaBankSoal(supabase, bank);
+  const { jumlah, error } = await masukkanSoalKeBagian(supabase, ujianId, listSoal, { mode, namaBank });
   if (error) redirect(halamanSoalUjian(ujianId, { bank, error }));
+  await hapusBagianKosong(supabase, ujianId);
 
   revalidatePath(`/dashboard/ujian/${ujianId}/soal`);
-  redirect(halamanSoalUjian(ujianId, { bank, sukses: `${jumlah} soal dimasukkan ke ujian` }));
+  redirect(halamanSoalUjian(ujianId, { bank, sukses: `${jumlah} soal disusun ke ujian` }));
 }
 
 // Cara tambahan: centang soal satu per satu; tiap soal tetap masuk ke bagian tipenya
@@ -267,15 +291,18 @@ export async function tambahSoalUjian(formData: FormData) {
   const ujianId = formData.get("ujian_id") as string;
   const bank = (formData.get("bank") as string) ?? "";
   const soalIds = formData.getAll("soal_ids[]").map(String).filter(Boolean);
+  const mode: ModeBagian = formData.get("mode") === "pisah" ? "pisah" : "gabung";
 
   await pastikanUjianDraft(supabase, ujianId, user.id);
   if (soalIds.length === 0) redirect(halamanSoalUjian(ujianId, { bank, error: "Centang minimal 1 soal" }));
 
-  const listSoal = await soalBaruUntukUjian(supabase, ujianId, user.id, { soalIds });
-  if (listSoal.length === 0) redirect(halamanSoalUjian(ujianId, { bank, error: "Soal itu sudah ada di ujian ini" }));
+  const listSoal = await soalUntukUjian(supabase, user.id, { soalIds });
+  if (listSoal.length === 0) redirect(halamanSoalUjian(ujianId, { bank, error: "Soal tidak ditemukan" }));
 
-  const { jumlah, error } = await masukkanSoalKeBagian(supabase, ujianId, listSoal);
+  const namaBank = await namaBankSoal(supabase, bank);
+  const { jumlah, error } = await masukkanSoalKeBagian(supabase, ujianId, listSoal, { mode, namaBank });
   if (error) redirect(halamanSoalUjian(ujianId, { bank, error }));
+  await hapusBagianKosong(supabase, ujianId);
 
   revalidatePath(`/dashboard/ujian/${ujianId}/soal`);
   redirect(halamanSoalUjian(ujianId, { bank, sukses: `${jumlah} soal ditambahkan` }));

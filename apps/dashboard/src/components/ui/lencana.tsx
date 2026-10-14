@@ -42,6 +42,7 @@ const statusPeserta: Record<string, { teks: string; nada: NadaLencana }> = {
 const tipeSoal: Record<string, { teks: string; nada: NadaLencana }> = {
   pg: { teks: "Pilihan ganda", nada: "nila" },
   benar_salah: { teks: "Benar/Salah", nada: "hijau" },
+  angket: { teks: "Angket", nada: "ungu" },
   essay: { teks: "Essay", nada: "kuning" },
 };
 

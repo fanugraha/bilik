@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { deleteSoal } from "@/actions/soal";
 import { updateBank, deleteBank, pindahkanSoal } from "@/actions/bank-soal";
 import { ambilDaftarMapel } from "@/lib/mapel";
+import { NAMA_TIPE, URUTAN_TIPE } from "@/lib/bagian-ujian";
 import { Tombol } from "@/components/ui/button";
 import { TombolKonfirmasi } from "@/components/ui/tombol-konfirmasi";
 import { PilihMapel } from "@/components/ui/pilih-mapel";
@@ -26,9 +27,7 @@ type ParamBank = Promise<{ error?: string; sukses?: string; tipe?: string; cari?
 
 const daftarFilter = [
   { nilai: "", teks: "Semua" },
-  { nilai: "pg", teks: "Pilihan ganda" },
-  { nilai: "benar_salah", teks: "Benar/Salah" },
-  { nilai: "essay", teks: "Essay" },
+  ...URUTAN_TIPE.map((tipe) => ({ nilai: tipe, teks: NAMA_TIPE[tipe] })),
 ];
 
 function hrefFilter(bankId: string, { tipe, cari }: { tipe?: string; cari?: string }) {

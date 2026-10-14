@@ -16,7 +16,7 @@ function JudulBagian({ judul, deskripsi }: { judul: string; deskripsi?: string }
   );
 }
 
-export type NilaiAwalInfoUjian = { judul: string; mapel_id: string | null; durasi: number };
+export type NilaiAwalInfoUjian = { judul: string; mapel_id: string | null; durasi: number; kkm: number };
 
 // Langkah 1 wizard: identitas ujian saja, agar guru cepat sampai ke pemilihan soal
 export function IsianInfoUjian({
@@ -45,6 +45,25 @@ export function IsianInfoUjian({
           </label>
           <input id="durasi" type="number" name="durasi" required min="1" max="600" defaultValue={nilaiAwal?.durasi ?? 60} className="bidang angka" />
         </div>
+      </div>
+      <div className="flex max-w-xs flex-col gap-1.5">
+        <label htmlFor="kkm" className="text-sm font-medium text-tinta">
+          KKM / nilai lulus
+        </label>
+        <input
+          id="kkm"
+          type="number"
+          name="kkm"
+          required
+          min="0"
+          max="100"
+          defaultValue={nilaiAwal?.kkm ?? 70}
+          aria-describedby="kkm-bantuan"
+          className="bidang angka"
+        />
+        <p id="kkm-bantuan" className="text-xs text-tinta-2">
+          Siswa dengan nilai di bawah KKM ditandai belum lulus di halaman nilai.
+        </p>
       </div>
     </div>
   );

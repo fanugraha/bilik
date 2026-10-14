@@ -5,6 +5,14 @@ import '../../../components/lencana.dart';
 import '../../../core/theme.dart';
 import '../../../models/soal.dart';
 
+// Angket: skala tetap 1-4, tanpa kunci. Skor = nilai pilihan siswa.
+const _pilihanAngket = <({String nilai, String teks})>[
+  (nilai: '4', teks: 'Sangat setuju'),
+  (nilai: '3', teks: 'Setuju'),
+  (nilai: '2', teks: 'Tidak setuju'),
+  (nilai: '1', teks: 'Sangat tidak setuju'),
+];
+
 /// Kartu soal + pilihan jawaban (PG / Benar-Salah / Essay).
 class KartuSoal extends StatelessWidget {
   const KartuSoal({
@@ -58,6 +66,8 @@ class KartuSoal extends StatelessWidget {
         return const Lencana('Pilihan ganda', nada: NadaLencana.nila);
       case 'benar_salah':
         return const Lencana('Benar / Salah', nada: NadaLencana.hijau);
+      case 'angket':
+        return const Lencana('Angket', nada: NadaLencana.ungu);
       default:
         return const Lencana('Essay', nada: NadaLencana.kuning);
     }
@@ -101,6 +111,14 @@ class KartuSoal extends StatelessWidget {
             ),
             onChanged: onAlasan,
           ),
+        ],
+      );
+    }
+    if (soal.isAngket) {
+      return Column(
+        children: [
+          for (final pilihan in _pilihanAngket)
+            _opsiTile(huruf: pilihan.nilai, teks: pilihan.teks, dipilih: isi == pilihan.nilai, nilai: pilihan.nilai),
         ],
       );
     }

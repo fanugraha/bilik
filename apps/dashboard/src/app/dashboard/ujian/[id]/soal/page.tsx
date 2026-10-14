@@ -20,10 +20,46 @@ import { TautanTombol } from "@/components/ui/tautan-tombol";
 export const metadata: Metadata = { title: "Ambil soal ujian" };
 
 type ParamSoal = Promise<{ bank?: string; error?: string; sukses?: string }>;
-type SoalUjianBaris = { soal_id: string; section_id: string | null; urutan: number; bobot: number; soal: { tipe: string; teks: string } | null };
+type SoalUjianBaris = {
+  soal_id: string;
+  section_id: string | null;
+  urutan: number;
+  bobot: number;
+  soal: { tipe: string; teks: string; bank: { nama: string } | { nama: string }[] | null } | null;
+  bank: string | null;
+};
 
 function namaBagian(tipe: string) {
   return adalahTipeSoal(tipe) ? NAMA_TIPE[tipe] : tipe;
+}
+
+function judulBagian(section: { judul: string | null; tipe: string }) {
+  return section.judul?.trim() || namaBagian(section.tipe);
+}
+
+// Pilihan cara mengelompokkan soal jadi bagian ujian.
+function PilihModeBagian() {
+  const pilihan = [
+    { nilai: "gabung", teks: "Gabung per tipe", ket: "Satu bagian per tipe (mis. semua Angket jadi satu)." },
+    { nilai: "pisah", teks: "Pisah per bank soal", ket: "Tiap bank jadi bagian sendiri (mis. “Benar/Salah Peredaran Darah”)." },
+  ];
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-tinta">Cara mengelompokkan soal</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {pilihan.map((p) => (
+          <label
+            key={p.nilai}
+            className="flex cursor-pointer flex-col rounded-lg border border-garis-tegas px-4 py-3 has-[:checked]:border-nila has-[:checked]:bg-nila-muda"
+          >
+            <input type="radio" name="mode" value={p.nilai} defaultChecked={p.nilai === "gabung"} className="sr-only" />
+            <span className="text-sm font-semibold text-tinta">{p.teks}</span>
+            <span className="text-xs text-tinta-2">{p.ket}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchParams: ParamSoal }) {
@@ -41,10 +77,10 @@ async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchPar
       .eq("id", ujianId)
       .eq("guru_id", user.id)
       .single(),
-    supabase.from("ujian_section").select("id, urutan, tipe").eq("ujian_id", ujianId).order("urutan", { ascending: true }),
+    supabase.from("ujian_section").select("id, urutan, tipe, judul").eq("ujian_id", ujianId).order("urutan", { ascending: true }),
     supabase
       .from("ujian_soal")
-      .select("soal_id, section_id, urutan, bobot, soal:soal_id(tipe, teks)")
+      .select("soal_id, section_id, urutan, bobot, soal:soal_id(tipe, teks, bank:bank_soal_id(nama))")
       .eq("ujian_id", ujianId)
       .order("urutan", { ascending: true }),
     supabase.from("bank_soal").select("id, nama").eq("guru_id", user.id).order("nama", { ascending: true }),
@@ -68,13 +104,19 @@ async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchPar
         .order("created_at", { ascending: true })
     : { data: [] as { id: string; tipe: string; teks: string }[] };
 
-  const baris: SoalUjianBaris[] = (ujianSoal ?? []).map((r) => ({
-    soal_id: r.soal_id,
-    section_id: r.section_id,
-    urutan: r.urutan,
-    bobot: Number(r.bobot),
-    soal: (Array.isArray(r.soal) ? r.soal[0] : r.soal) as SoalUjianBaris["soal"],
-  }));
+  const baris: SoalUjianBaris[] = (ujianSoal ?? []).map((r) => {
+    const soal = (Array.isArray(r.soal) ? r.soal[0] : r.soal) as SoalUjianBaris["soal"];
+    const bankRel = soal?.bank;
+    const bank = (Array.isArray(bankRel) ? bankRel[0] : bankRel)?.nama ?? null;
+    return {
+      soal_id: r.soal_id,
+      section_id: r.section_id,
+      urutan: r.urutan,
+      bobot: Number(r.bobot),
+      soal,
+      bank,
+    };
+  });
   const idSudahAda = new Set(baris.map((b) => b.soal_id));
   const totalSoal = baris.length;
   const totalBobot = baris.reduce((total, b) => total + b.bobot, 0);
@@ -114,7 +156,7 @@ async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchPar
         {/* Ambil dari bank: di atas pada layar kecil, di kanan pada layar lebar */}
         <Kartu
           judul="Ambil soal dari bank"
-          deskripsi="Pilih bank, centang tipe soal. Semua soal tipe itu masuk ke ujian, dikelompokkan per tipe."
+          deskripsi="Pilih bank, centang tipe soal, lalu pilih cara mengelompokkan (gabung per tipe atau pisah per bank)."
           tanpaPadding
           className="lg:sticky lg:top-8 lg:order-2"
         >
@@ -153,40 +195,32 @@ async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchPar
                   aksi={<TautanTombol href={hrefTulisSoal} teks="Tulis soal" jenis="utama" ikon="tambah" />}
                 />
               ) : (
-                <form action={ambilSoalPerTipe} className="space-y-2 p-5">
+                <form action={ambilSoalPerTipe} className="space-y-3 p-5">
                   <input type="hidden" name="ujian_id" value={ujianId} />
                   <input type="hidden" name="bank" value={bank} />
+                  <PilihModeBagian />
                   {URUTAN_TIPE.filter((tipe) => totalPerTipe[tipe] > 0).map((tipe) => {
                     const tersedia = tersediaPerTipe[tipe];
+                    const total = totalPerTipe[tipe];
                     return (
                       <label
                         key={tipe}
-                        className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${
-                          tersedia === 0
-                            ? "cursor-not-allowed border-garis bg-kertas opacity-70"
-                            : "cursor-pointer border-garis-tegas has-[:checked]:border-nila has-[:checked]:bg-nila-muda"
-                        }`}
+                        className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-garis-tegas px-4 py-3 has-[:checked]:border-nila has-[:checked]:bg-nila-muda"
                       >
                         <span className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            name="tipe"
-                            value={tipe}
-                            defaultChecked={tersedia > 0}
-                            disabled={tersedia === 0}
-                            className="h-4 w-4 accent-[var(--color-nila)]"
-                          />
+                          <input type="checkbox" name="tipe" value={tipe} defaultChecked className="h-4 w-4 accent-[var(--color-nila)]" />
                           <span className="text-sm font-semibold text-tinta">{NAMA_TIPE[tipe]}</span>
                         </span>
-                        <span className="text-xs text-tinta-2">{tersedia === 0 ? "Sudah semua masuk" : `${tersedia} soal`}</span>
+                        <span className="text-xs text-tinta-2">
+                          {tersedia === 0 ? `${total} soal (semua sudah masuk)` : `${tersedia} baru, ${total} soal`}
+                        </span>
                       </label>
                     );
                   })}
-                  {listTersedia.length > 0 ? (
-                    <Tombol teks="Masukkan ke ujian" ikon="tambah" teksProses="Memasukkan..." className="mt-2 w-full" />
-                  ) : (
-                    <p className="pt-1 text-sm text-tinta-2">Semua soal dari bank ini sudah ada di ujian.</p>
-                  )}
+                  <Tombol teks="Terapkan ke ujian" ikon="tambah" teksProses="Menyusun..." className="mt-2 w-full" />
+                  <p className="pt-1 text-xs text-tinta-2">
+                    Soal yang sudah masuk akan disusun ulang sesuai cara mengelompokkan di atas.
+                  </p>
                 </form>
               )}
 
@@ -198,6 +232,9 @@ async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchPar
                   <form action={tambahSoalUjian}>
                     <input type="hidden" name="ujian_id" value={ujianId} />
                     <input type="hidden" name="bank" value={bank} />
+                    <div className="px-5 py-4">
+                      <PilihModeBagian />
+                    </div>
                     <ul className="max-h-[50vh] divide-y divide-garis overflow-y-auto border-t border-garis">
                       {listTersedia.map((soal) => (
                         <li key={soal.id}>
@@ -248,12 +285,16 @@ async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchPar
                 let nomor = 0;
                 return grup.map((g, indeksGrup) => {
                   const indeksSection = g.section ? sections.findIndex((s) => s.id === g.section!.id) : -1;
+                  const bankBagian = [...new Set(g.daftar.map((b) => b.bank).filter((x): x is string => !!x))];
                   return (
                     <section key={g.section?.id ?? "tanpa"}>
                       <div className="flex flex-wrap items-center justify-between gap-2 bg-kertas/60 px-5 py-2.5">
                         <p className="text-sm font-semibold text-tinta">
-                          {g.section ? `Bagian ${indeksGrup + 1} · ${namaBagian(g.section.tipe)}` : "Tanpa bagian"}
+                          {g.section ? `Bagian ${indeksGrup + 1} · ${judulBagian(g.section)}` : "Tanpa bagian"}
                           <span className="ml-2 font-normal text-tinta-2">{g.daftar.length} soal</span>
+                          {bankBagian.length > 0 && (
+                            <span className="ml-2 font-normal text-tinta-3">· bank: {bankBagian.join(", ")}</span>
+                          )}
                         </p>
                         {g.section && (
                           <div className="flex items-center gap-1">
@@ -283,7 +324,7 @@ async function AmbilSoal({ ujianId, searchParams }: { ujianId: string; searchPar
                                 teks="Kosongkan"
                                 jenis="hantu"
                                 ukuran="kecil"
-                                pesanKonfirmasi={`Keluarkan semua ${g.daftar.length} soal ${namaBagian(g.section.tipe)} dari ujian ini? Soal di bank tetap ada.`}
+                                pesanKonfirmasi={`Keluarkan semua ${g.daftar.length} soal ${judulBagian(g.section)} dari ujian ini? Soal di bank tetap ada.`}
                                 className="hover:text-merah"
                               />
                             </form>

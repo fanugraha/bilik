@@ -29,7 +29,7 @@ async function LangkahInfo({ params, searchParams }: { params: Promise<{ id: str
 
   const { data: ujian } = await supabase
     .from("ujian")
-    .select("id, judul, mapel_id, durasi, status")
+    .select("id, judul, mapel_id, durasi, status, kkm")
     .eq("id", ujianId)
     .eq("guru_id", user.id)
     .single();
@@ -52,7 +52,7 @@ async function LangkahInfo({ params, searchParams }: { params: Promise<{ id: str
       <Kartu judul="Info ujian">
         <form action={simpanInfoUjian}>
           <input type="hidden" name="id" value={ujian.id} />
-          <IsianInfoUjian daftarMapel={daftarMapel} nilaiAwal={{ judul: ujian.judul, mapel_id: ujian.mapel_id, durasi: ujian.durasi }} />
+          <IsianInfoUjian daftarMapel={daftarMapel} nilaiAwal={{ judul: ujian.judul, mapel_id: ujian.mapel_id, durasi: ujian.durasi, kkm: ujian.kkm }} />
           <div className="mt-6 flex flex-row-reverse justify-start gap-2 border-t border-garis pt-5">
             <Tombol teks="Simpan & lanjut: ambil soal" teksProses="Menyimpan..." />
             <TautanTombol href={`/dashboard/ujian/${ujianId}/soal`} teks="Lewati" jenis="hantu" />

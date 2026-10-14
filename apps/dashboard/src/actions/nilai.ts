@@ -20,10 +20,10 @@ export async function hitungNilaiOtomatis(formData: FormData) {
   if (error) redirect(`/dashboard/ujian/${ujianId}/nilai?error=` + encodeURIComponent(error.message));
 
   revalidatePath(`/dashboard/ujian/${ujianId}/nilai`);
-  redirect(`/dashboard/ujian/${ujianId}/nilai?sukses=` + encodeURIComponent("Nilai PG dan Benar/Salah sudah dihitung ulang"));
+  redirect(`/dashboard/ujian/${ujianId}/nilai?sukses=` + encodeURIComponent("Nilai otomatis (PG, Benar/Salah, Angket) sudah dihitung ulang"));
 }
 
-export async function simpanSkorEssay(formData: FormData) {
+export async function simpanSkorManual(formData: FormData) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -46,7 +46,7 @@ export async function simpanSkorEssay(formData: FormData) {
   if (!peserta) redirect(`/dashboard/ujian/${ujianId}/nilai`);
 
   for (const soal of rekap.listSoal) {
-    if (soal.tipe !== "essay") continue;
+    if (soal.tipe === "pg") continue;
 
     const sudahDijawab = peserta.listJawaban.some((jawaban) => jawaban.soalId === soal.soalId);
     if (!sudahDijawab) continue;
@@ -76,13 +76,19 @@ export async function simpanSkorEssay(formData: FormData) {
 
   revalidatePath(`/dashboard/ujian/${ujianId}/nilai`);
 
-  // Tombol "Simpan & lanjut" mengirim id peserta berikutnya
+  // Tombol navigasi menyimpan dulu baru pindah, agar skor yang diketik tidak hilang.
+  const adaPeserta = (id: string) => rekap.listBaris.some((baris) => baris.pesertaId === id);
   const pesertaBerikutnya = formData.get("lanjut_ke") as string | null;
-  if (pesertaBerikutnya && rekap.listBaris.some((baris) => baris.pesertaId === pesertaBerikutnya)) {
+  if (pesertaBerikutnya && adaPeserta(pesertaBerikutnya)) {
     redirect(`/dashboard/ujian/${ujianId}/nilai/${pesertaBerikutnya}?sukses=` + encodeURIComponent(`Skor ${peserta.nama} tersimpan`));
   }
 
-  redirect(halamanKoreksi + "?sukses=" + encodeURIComponent("Skor essay tersimpan"));
+  const pesertaSebelumnya = formData.get("kembali_ke") as string | null;
+  if (pesertaSebelumnya && adaPeserta(pesertaSebelumnya)) {
+    redirect(`/dashboard/ujian/${ujianId}/nilai/${pesertaSebelumnya}?sukses=` + encodeURIComponent(`Skor ${peserta.nama} tersimpan`));
+  }
+
+  redirect(halamanKoreksi + "?sukses=" + encodeURIComponent("Skor tersimpan"));
 }
 
 export async function tandaiDinilai(formData: FormData) {
@@ -103,14 +109,14 @@ export async function tandaiDinilai(formData: FormData) {
     redirect(halamanNilai + "?error=" + encodeURIComponent("Hanya ujian berstatus selesai yang bisa ditandai dinilai"));
   }
 
-  let jumlahEssayBelumDikoreksi = 0;
-  for (const baris of rekap.listBaris) jumlahEssayBelumDikoreksi += baris.essayBelumDikoreksi;
+  let jumlahBelumDinilai = 0;
+  for (const baris of rekap.listBaris) jumlahBelumDinilai += baris.belumDinilai;
 
-  if (jumlahEssayBelumDikoreksi > 0) {
+  if (jumlahBelumDinilai > 0) {
     redirect(
       halamanNilai +
         "?error=" +
-        encodeURIComponent(`Masih ada ${jumlahEssayBelumDikoreksi} jawaban essay yang belum dikoreksi`),
+        encodeURIComponent(`Masih ada ${jumlahBelumDinilai} jawaban yang belum dinilai`),
     );
   }
 

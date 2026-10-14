@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rekapPerSoal, sebaranNilai, type BarisRekap, type JawabanPeserta, type SoalUjian } from "./nilai";
+import { lulus, rekapPerSoal, sebaranNilai, skorMaksSoal, type BarisRekap, type JawabanPeserta, type SoalUjian } from "./nilai";
 
 function soal(partial: Partial<SoalUjian> & Pick<SoalUjian, "soalId" | "tipe">): SoalUjian {
   return { urutan: 1, bobot: 1, teks: "", ...partial };
@@ -13,8 +13,8 @@ function baris(partial: Partial<BarisRekap> & Pick<BarisRekap, "pesertaId">): Ba
     status: "selesai",
     jumlahPelanggaran: 0,
     skorOtomatis: 0,
-    skorEssay: 0,
-    essayBelumDikoreksi: 0,
+    skorManual: 0,
+    belumDinilai: 0,
     totalSkor: 0,
     nilai: 0,
     listJawaban: [],
@@ -47,17 +47,17 @@ describe("rekapPerSoal", () => {
 
   const stat = rekapPerSoal(listSoal, listBaris);
 
-  it("menghitung benar/salah/kosong untuk PG", () => {
+  it("PG saja yang dihitung benar/salah", () => {
     expect(stat[0].benar).toBe(2);
     expect(stat[0].salah).toBe(0);
     expect(stat[0].kosong).toBe(1);
     expect(stat[0].persenBenar).toBe(100);
   });
 
-  it("menghitung benar/salah untuk Benar/Salah", () => {
-    expect(stat[1].benar).toBe(1);
-    expect(stat[1].salah).toBe(1);
-    expect(stat[1].persenBenar).toBe(50);
+  it("Benar/Salah dinilai manual: rata-rata skor, tanpa % benar", () => {
+    expect(stat[1].rataRataSkor).toBe(0.5);
+    expect(stat[1].belumDikoreksi).toBe(0);
+    expect(stat[1].persenBenar).toBeNull();
   });
 
   it("menghitung essay: kosong, belum dikoreksi, rata-rata, tanpa % benar", () => {
@@ -74,6 +74,35 @@ describe("rekapPerSoal", () => {
     );
     expect(hasil[0].salah).toBe(1);
     expect(hasil[0].benar).toBe(0);
+  });
+
+  it("angket dinilai manual: rata-rata skor, tanpa % benar", () => {
+    const hasil = rekapPerSoal(
+      [soal({ soalId: "a", tipe: "angket", bobot: 4 })],
+      [
+        baris({ pesertaId: "A", listJawaban: [jawaban("a", "4", 4)] }),
+        baris({ pesertaId: "B", listJawaban: [jawaban("a", "2", 2)] }),
+        baris({ pesertaId: "C", listJawaban: [] }),
+      ],
+    );
+    expect(hasil[0].rataRataSkor).toBe(3);
+    expect(hasil[0].persenBenar).toBeNull();
+    expect(hasil[0].kosong).toBe(1);
+  });
+});
+
+describe("skorMaksSoal", () => {
+  it("skor maks = bobot untuk semua tipe (termasuk angket)", () => {
+    expect(skorMaksSoal({ tipe: "angket", bobot: 4 })).toBe(4);
+    expect(skorMaksSoal({ tipe: "pg", bobot: 2 })).toBe(2);
+  });
+});
+
+describe("lulus", () => {
+  it("lulus saat nilai mencapai KKM (termasuk tepat di KKM)", () => {
+    expect(lulus(70, 70)).toBe(true);
+    expect(lulus(69.9, 70)).toBe(false);
+    expect(lulus(100, 70)).toBe(true);
   });
 });
 
